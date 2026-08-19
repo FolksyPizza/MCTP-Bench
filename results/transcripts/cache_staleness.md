@@ -1,7 +1,7 @@
 # cache_staleness — verbatim Agent B outputs
 
 Runner: isolated Claude subagent, given only its context and an identical neutral question.
-One trial per condition. See `MCTP/docs/EXPERIMENTS.md` for methodology.
+One trial per condition. See the MCTP experiment record for methodology.
 
 ---
 
@@ -34,4 +34,4 @@ RETRIEVE art_cacheclient art_versionstore
 The MCTP agent produced a complete, correct answer (items 1–3) from the references before
 retrieving; the two pulls were confirmatory rather than necessary. This receiver-side
 over-retrieval reduces the total-token advantage (529 versus 557, a 5.0% reduction) even
-though the packet alone was sufficient. See `MCTP/docs/EXPERIMENTS.md`, finding 3.
+though the packet alone was sufficient. See the MCTP experiment record, finding 3.

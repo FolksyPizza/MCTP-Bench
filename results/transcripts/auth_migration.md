@@ -1,7 +1,7 @@
 # auth_migration — verbatim Agent B outputs
 
 Runner: isolated Claude subagent, given only its context and an identical neutral question.
-One trial per condition. See `MCTP/docs/EXPERIMENTS.md` for methodology.
+One trial per condition. See the MCTP experiment record for methodology.
 
 ---
 
@@ -29,4 +29,4 @@ Both chose JWT (no regression to sessions). Two observations: (a) the MCTP condi
 token-worse here (436 total versus 291) because the flat transcript was already concise and
 the agent made two pulls; (b) because the selector excluded the superseded session decision,
 the MCTP agent could not cite the rejected "scale the store" sub-alternative that the flat
-agent named. See `MCTP/docs/EXPERIMENTS.md`, findings 2 and 4.
+agent named. See the MCTP experiment record, findings 2 and 4.

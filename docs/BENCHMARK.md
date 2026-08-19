@@ -62,8 +62,8 @@ Multi-file changes requiring dependency understanding and navigation across a la
 - Failure modes: missing a dependency edge; proposing a change that ignores a caller.
 - Why MCTP should help: dependency relations are explicit, so the relevant subgraph can be
   transferred without the whole repository.
-- Status: specified; not yet implemented. Requires a larger authored graph and a
-  multi-part scoring rubric.
+- Scenarios: `payment_idempotency` (implemented) — a ~2,300-token investigation with several
+  read-but-irrelevant files and two superseded approaches.
 
 ### Category 5 — Multi-agent workflows
 A research agent, an implementation agent, and a testing agent operate in sequence through
@@ -84,6 +84,7 @@ shared MCTP state.
 | `cache_staleness` | 2 | Fix distributed-cache stale reads | superseded TTL-tuning decision |
 | `auth_migration` | 2 | Continue an auth migration | rejected session-cookie approach |
 | `artifact_selection` | 3 | Answer a config question across many files | only one file is relevant |
+| `payment_idempotency` | 4 | Fix duplicate charges in a large, noisy investigation | superseded lock and heuristic approaches |
 
-Categories 4 and 5 are specified above and left unimplemented pending the larger-graph and
-multi-handoff support they require.
+Category 5 is specified above and left unimplemented pending the multi-handoff support it
+requires.

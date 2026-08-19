@@ -1,7 +1,7 @@
 # artifact_selection — verbatim Agent B outputs
 
 Runner: isolated Claude subagent, given only its context and an identical neutral question.
-One trial per condition. See `MCTP/docs/EXPERIMENTS.md` for methodology.
+One trial per condition. See the MCTP experiment record for methodology.
 
 ---
 

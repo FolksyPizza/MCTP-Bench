@@ -1,4 +1,4 @@
-"""The `episode` record — one handoff run, per PLAN.md §6.2.
+"""The `episode` record — one handoff run.
 
 This is the unit of MCTP-Bench data: what was delivered, what the receiver did, and how it
 scored. Logged as JSONL so runs accumulate into a training/eval corpus.

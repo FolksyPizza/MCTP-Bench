@@ -1,7 +1,8 @@
 # MCTP-Bench
 
-Evaluation harness for [MCTP](../MCTP). It runs handoff experiments as repeatable, scored
-episodes and measures whether MCTP maintains task performance while reducing context cost.
+Evaluation harness for [MCTP](https://github.com/FolksyPizza/MCTP). It runs handoff
+experiments as repeatable, scored episodes and measures whether MCTP maintains task
+performance while reducing context cost.
 
 ## Run
 
@@ -24,7 +25,7 @@ to count with it; under the system interpreter only the heuristic is available.
 
 ```
 mctpbench/
-  episode.py      # episode record (PLAN.md §6.2) and JSONL logging
+  episode.py      # episode record and JSONL logging
   conditions.py   # build flat vs mctp context from a scenario (Core selector/transfer)
   runner.py       # AgentRunner interface: MockRunner (deterministic) and RunResult
   harness.py      # run_episode(...) and record_real(...) for model-in-the-loop runs
@@ -35,6 +36,7 @@ scenarios/
   cache_staleness.py     # decision transfer (Category 2)
   auth_migration.py      # decision transfer (Category 2)
   artifact_selection.py  # artifact retrieval (Category 3)
+  payment_idempotency.py # larger repository task, high token count (Category 4)
 run.py           # CLI entry point
 results/         # episodes.jsonl and verbatim agent transcripts
 ```
@@ -44,7 +46,7 @@ results/         # episodes.jsonl and verbatim agent transcripts
 - `flat` — raw Agent-A transcript (everything inline, stale content included).
 - `mctp` — Core cold-start selector packet plus a retrieve-on-demand blob map.
 
-## Metrics (PLAN.md §8.5)
+## Metrics
 
 Accuracy (pass rate and gold sub-criteria), efficiency (context, retrieved, and total
 tokens), behavior (pulls and codebase reads), and the MISLEADING count (whether provided
@@ -68,12 +70,16 @@ statistical evaluation.
 | auth_migration | mctp | 100% | 341 | 95 | 436 | 2 | 0 |
 | artifact_selection | flat | 100% | 184 | 0 | 184 | 0 | 0 |
 | artifact_selection | mctp | 100% | 103 | 34 | 137 | 1 | 0 |
+| payment_idempotency | flat | 100% | 2319 | 0 | 2319 | 0 | 0 |
+| payment_idempotency | mctp | 100% | 486 | 159 | 645 | 2 | 0 |
 
 Every cell passed the checks with no misleading answers, including both `flat` baselines.
 Because the baseline also passed, these runs compare context cost at equal task success rather
-than showing a correctness difference. On cost, MCTP reduced total tokens in three of four
-scenarios and increased them in one (`auth_migration`). See `docs/BENCHMARK.md` for the suite
-design and `MCTP/docs/EXPERIMENTS.md` for methodology and findings.
+than showing a correctness difference. On cost, MCTP reduced total tokens in four of five
+scenarios and increased them in one; the effect scales with how much of the context is
+prunable (`payment_idempotency` −72%, `auth_migration` +50%). See [docs/BENCHMARK.md](docs/BENCHMARK.md)
+for the suite design and the [experiment record](https://github.com/FolksyPizza/MCTP/blob/main/docs/EXPERIMENTS.md)
+in the MCTP repository for methodology and findings.
 
 ## Limitations
 

@@ -1,7 +1,7 @@
 # bug43 — verbatim Agent B outputs
 
 Runner: isolated Claude subagent, given only its context and an identical neutral question.
-One trial per condition. See `MCTP/docs/EXPERIMENTS.md` for methodology.
+One trial per condition. See the MCTP experiment record for methodology.
 
 ---
 
@@ -45,4 +45,4 @@ Nothing missing — implementable confidently.
 ```
 
 The round-1 request for full source is the intended retrieve-on-demand behavior: a precise,
-targeted pull rather than the vague gap produced by summary-only artifacts (PLAN.md §8.6.2).
+targeted pull rather than the vague gap produced by summary-only artifacts (see the MCTP experiment record).
