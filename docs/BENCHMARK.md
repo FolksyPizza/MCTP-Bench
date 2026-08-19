@@ -62,8 +62,8 @@ Multi-file changes requiring dependency understanding and navigation across a la
 - Failure modes: missing a dependency edge; proposing a change that ignores a caller.
 - Why MCTP should help: dependency relations are explicit, so the relevant subgraph can be
   transferred without the whole repository.
-- Scenarios: `payment_idempotency` (implemented) — a ~2,300-token investigation with several
-  read-but-irrelevant files and two superseded approaches.
+- Scenarios: `payment_idempotency` and `outage_investigation` (implemented) — ~2,300 and
+  ~2,500-token investigations with several read-but-irrelevant files and superseded approaches.
 
 ### Category 5 — Multi-agent workflows
 A research agent, an implementation agent, and a testing agent operate in sequence through
@@ -85,6 +85,30 @@ shared MCTP state.
 | `auth_migration` | 2 | Continue an auth migration | rejected session-cookie approach |
 | `artifact_selection` | 3 | Answer a config question across many files | only one file is relevant |
 | `payment_idempotency` | 4 | Fix duplicate charges in a large, noisy investigation | superseded lock and heuristic approaches |
+| `schema_migration` | 4 | Zero-downtime column migration under hard constraints | superseded blocking ALTER and maintenance window |
+| `api_versioning` | 2 | Implement v2 API authentication | superseded URL query-string token |
+| `flaky_test` | 1 | Fix a time-dependent flaky test | superseded retry and sleep band-aids |
+| `outage_investigation` | 4 | Fix a cascading outage (stampede + retry storm) | superseded scale-out and timeout increase |
+| `hidden_constraint` | negative | Add a bulk-delete endpoint | required soft-delete constraint omitted from the packet |
 
 Category 5 is specified above and left unimplemented pending the multi-handoff support it
-requires.
+requires. `hidden_constraint` is a negative control: the constraint needed to answer correctly
+is present in the graph but not linked to the task, so the packet omits it and the mctp
+condition fails — demonstrating that the suite can fail MCTP and that extraction/linking fidelity
+is the ceiling.
+
+## Future directions
+
+- External OSS benchmarks. Adapt established suites so MCTP is measured on independent tasks
+  rather than only hand-authored scenarios: SWE-bench (real GitHub issue-to-patch tasks on large
+  repositories, a natural fit for the handoff and large-repository categories), HumanEval /
+  MBPP (function-level code generation, to check that state transfer does not degrade a
+  well-scoped coding task), and broad knowledge suites such as HLE or MMLU-style sets (to probe
+  whether structured state helps or hurts on reasoning-heavy questions). Each requires an
+  adapter that builds an MCTP graph from the task's repository or context and a `flat` baseline
+  from the same source, then scores with the benchmark's own harness. This is a substantial
+  effort and is not yet implemented.
+- Multi-trial runs and human-validated scoring, to move from single-trial existence checks to
+  statistically meaningful results.
+- Additional model families (via the Hugging Face tokenizer hook and API-backed runners) for
+  cross-model-family evidence.

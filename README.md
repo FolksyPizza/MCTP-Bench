@@ -31,12 +31,7 @@ mctpbench/
   harness.py      # run_episode(...) and record_real(...) for model-in-the-loop runs
   scoring.py      # aggregate report grouped by (scenario, condition, runner)
   tokenizers.py   # token counting: heuristic, tiktoken encodings, optional Hugging Face
-scenarios/
-  bug43.py               # coding handoff (Category 1)
-  cache_staleness.py     # decision transfer (Category 2)
-  auth_migration.py      # decision transfer (Category 2)
-  artifact_selection.py  # artifact retrieval (Category 3)
-  payment_idempotency.py # larger repository task, high token count (Category 4)
+scenarios/       # ten scenarios; see docs/SCENARIOS.md for what each does
 run.py           # CLI entry point
 results/         # episodes.jsonl and verbatim agent transcripts
 ```
@@ -56,30 +51,18 @@ codebase read is a severe miss.
 ## Results
 
 Single trial per condition, all runs using Claude models, task success judged by keyword-based
-checks. Token counts use the tiktoken `o200k_base` encoding (see
-`results/token_comparison.md` for other tokenizers). These are preliminary and are not a
-statistical evaluation.
+checks. Token counts use the tiktoken `o200k_base` encoding (see `results/token_comparison.md`
+for other tokenizers). These are preliminary and are not a statistical evaluation.
 
-| Scenario | Condition | Pass | Context | Retrieved | Total | Pulls | Misleading |
-|----------|-----------|------|---------|-----------|-------|-------|------------|
-| bug43 | flat | 100% | 783 | 0 | 783 | 0 | 0 |
-| bug43 | mctp | 100% | 420 | 93 | 513 | 1 | 0 |
-| cache_staleness | flat | 100% | 557 | 0 | 557 | 0 | 0 |
-| cache_staleness | mctp | 100% | 417 | 112 | 529 | 2 | 0 |
-| auth_migration | flat | 100% | 291 | 0 | 291 | 0 | 0 |
-| auth_migration | mctp | 100% | 341 | 95 | 436 | 2 | 0 |
-| artifact_selection | flat | 100% | 184 | 0 | 184 | 0 | 0 |
-| artifact_selection | mctp | 100% | 103 | 34 | 137 | 1 | 0 |
-| payment_idempotency | flat | 100% | 2319 | 0 | 2319 | 0 | 0 |
-| payment_idempotency | mctp | 100% | 486 | 159 | 645 | 2 | 0 |
-
-Every cell passed the checks with no misleading answers, including both `flat` baselines.
-Because the baseline also passed, these runs compare context cost at equal task success rather
-than showing a correctness difference. On cost, MCTP reduced total tokens in four of five
-scenarios and increased them in one; the effect scales with how much of the context is
-prunable (`payment_idempotency` −72%, `auth_migration` +50%). See [docs/BENCHMARK.md](docs/BENCHMARK.md)
-for the suite design and the [experiment record](https://github.com/FolksyPizza/MCTP/blob/main/docs/EXPERIMENTS.md)
-in the MCTP repository for methodology and findings.
+Across ten scenarios (20 conditions): the `flat` baseline passed all ten; the `mctp` condition
+passed nine and failed one (`hidden_constraint`, where the packet omitted a required constraint
+that was present in the transcript but not linked to the task). No misleading answers. On cost,
+MCTP reduced total tokens in eight of ten scenarios and increased them in two; the effect scales
+with how prunable the context is — from `outage_investigation` (−67%) and `payment_idempotency`
+(−72%) on large, noisy transcripts to `auth_migration` (+50%) and `flaky_test` (+4%) on small,
+already-concise ones. Per-scenario descriptions and numbers are in
+[docs/SCENARIOS.md](docs/SCENARIOS.md); the full results table and methodology are in the
+[experiment record](https://github.com/FolksyPizza/MCTP/blob/main/docs/EXPERIMENTS.md).
 
 ## Limitations
 
