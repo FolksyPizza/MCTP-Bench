@@ -97,18 +97,33 @@ is present in the graph but not linked to the task, so the packet omits it and t
 condition fails — demonstrating that the suite can fail MCTP and that extraction/linking fidelity
 is the ceiling.
 
-## Future directions
+## Scaling the benchmark
 
-- External OSS benchmarks. Adapt established suites so MCTP is measured on independent tasks
-  rather than only hand-authored scenarios: SWE-bench (real GitHub issue-to-patch tasks on large
-  repositories, a natural fit for the handoff and large-repository categories), HumanEval /
-  MBPP (function-level code generation, to check that state transfer does not degrade a
-  well-scoped coding task), and broad knowledge suites such as HLE or MMLU-style sets (to probe
-  whether structured state helps or hurts on reasoning-heavy questions). Each requires an
-  adapter that builds an MCTP graph from the task's repository or context and a `flat` baseline
-  from the same source, then scores with the benchmark's own harness. This is a substantial
-  effort and is not yet implemented.
-- Multi-trial runs and human-validated scoring, to move from single-trial existence checks to
-  statistically meaningful results.
-- Additional model families (via the Hugging Face tokenizer hook and API-backed runners) for
-  cross-model-family evidence.
+The ten in-house scenarios are illustrative controls with known ground truth and deliberate
+traps. Scale — the goal is several hundred to a thousand tasks — comes from adapting existing
+open-source benchmarks rather than authoring more in-house scenarios, so MCTP is measured on
+independent tasks across a range of context sizes:
+
+- Low context: function- or question-level tasks — HumanEval, MBPP (code), and short QA /
+  reasoning sets (GSM8K, MMLU-style). Checks that structured transfer does not degrade tasks
+  that are already well scoped.
+- Medium context: multi-step or small multi-file tasks with moderate context.
+- High context: real-repository and long-context tasks — SWE-bench / SWE-bench Verified (GitHub
+  issue-to-patch on large repositories), RepoBench, and long-context suites (LongBench-style).
+  This is the regime where MCTP is expected to help most.
+
+Each external suite needs an adapter that (1) builds an MCTP graph from the task's repository or
+context, (2) constructs the `flat` baseline from the same source, (3) runs both conditions
+through a model runner, and (4) scores with the benchmark's own harness (unit tests, exact
+match, or its judge) rather than the in-house keyword checks. Two prerequisites:
+
+- A model runner against local or hosted inference. The `AgentRunner` interface and the Hugging
+  Face tokenizer hook already provide the seam.
+- An extractor that turns a real repository or transcript into an MCTP graph. The current
+  scenarios hand-author their graphs; running external benchmarks at scale requires automatic
+  extraction, which also finally exercises extraction fidelity — the system's ceiling — at scale
+  (see the `hidden_constraint` finding and the negative control above).
+
+Alongside scale, multi-trial runs and human- or judge-validated scoring will move results from
+single-trial existence checks to statistically meaningful ones, and additional model families
+will provide cross-model-family evidence.
