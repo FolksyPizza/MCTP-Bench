@@ -137,3 +137,27 @@ match, or its judge) rather than the in-house keyword checks. Two prerequisites:
 Alongside scale, multi-trial runs and human- or judge-validated scoring will move results from
 single-trial existence checks to statistically meaningful ones, and additional model families
 will provide cross-model-family evidence.
+
+## Compute budget (how to estimate it)
+
+Inference time is dominated by two parts: prefill (reading the input context) and generation
+(producing the answer). On a fixed GPU, throughput depends on how many requests run
+concurrently, which the **context length** caps — each in-flight request holds a KV cache
+proportional to its context, so long contexts mean a smaller batch and lower aggregate
+throughput. Model size caps how many model instances fit at all (a 32B 4-bit model uses ~2×3090
+via tensor parallel; small models can run one per card).
+
+Estimate the total as:
+
+```
+time ≈ (total input tokens / prefill throughput) + (total output tokens / generation throughput)
+total tokens = tasks × conditions × models × trials × per-run tokens
+             + summarizer calls (for the summary condition)
+             + extraction calls (for the mctp condition, once per task)
+```
+
+The `transcript` and `summary` conditions are the expensive ones to run (large inputs); the
+`mctp` condition is the cheapest (small packets) — so MCTP is also cheaper to benchmark, which
+is itself worth reporting. Throughput numbers are hardware- and model-specific, so **calibrate
+with a 50–100 task micro-run first** to measure real tokens/second, then extrapolate rather than
+trusting a paper estimate.
