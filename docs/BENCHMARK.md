@@ -25,6 +25,16 @@ Every scenario is evaluated under at least two conditions:
 - `mctp` — the Core selector packet (explicit state + artifact references) with
   retrieve-on-demand.
 
+Two further baselines are planned so MCTP is compared against strong alternatives rather than
+only a raw dump:
+
+- `summary` — an LLM condenses Agent A's context into a handoff. The summarizer's own inference
+  cost is counted in the total, not just the summary's token size.
+- `rag` — the same source is stored and fetched with conventional vector retrieval.
+
+Total cost for every condition is accounted the same way: Agent A inference + any preparation
+inference (e.g. summarization) + retrieval/infrastructure + Agent B inference.
+
 ## Categories
 
 ### Category 1 — Coding handoff
