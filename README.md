@@ -11,7 +11,16 @@ python3 run.py                       # MockRunner over all scenarios x condition
 python3 run.py --real                # additionally include recorded model-in-the-loop episodes
 python3 run.py --compare-tokenizers  # per-scenario token counts under every tokenizer
 python3 run.py --tokenizer tiktoken:cl100k_base   # count with a specific tokenizer
+
+# sweep a real model over an OpenAI-compatible endpoint (vLLM, Ollama, ...):
+python3 run.py --model Qwen/Qwen2.5-32B-Instruct-AWQ --url http://SERVER:8000/v1 --trials 3
 ```
+
+`--model` runs every scenario x condition (x `--trials`) through the endpoint and writes to
+`results/model_runs.jsonl`, separate from the curated data. Configure via flags or the
+`MCTP_MODEL_URL`, `MCTP_MODEL`, and `MCTP_API_KEY` environment variables; the runner handles the
+`RETRIEVE <id>` retrieve-on-demand round. `--limit N` runs only the first N scenarios (smoke
+test).
 
 The harness requires the Core MCTP package, located via `MCTP_HOME` (default: sibling
 `../MCTP`). Override for a different checkout: `MCTP_HOME=/path/to/MCTP python3 run.py`.

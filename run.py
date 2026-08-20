@@ -20,7 +20,7 @@ from mctpbench import tokenizers  # noqa: E402
 from mctpbench.conditions import make_context, tokens  # noqa: E402
 from mctpbench.episode import append_jsonl, read_jsonl  # noqa: E402
 from mctpbench.harness import record_real, run_episode  # noqa: E402
-from mctpbench.runner import MockRunner  # noqa: E402
+from mctpbench.runner import MockRunner, OpenAICompatRunner  # noqa: E402
 from mctpbench.scoring import report  # noqa: E402
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scenarios"))
@@ -98,15 +98,53 @@ def compare_tokenizers():
     print("\n(counts = delivered context + all retrievable artifact source)")
 
 
+def _arg(args, name, default=None):
+    i = args.index(name) if name in args else -1
+    return args[i + 1] if 0 <= i < len(args) - 1 else default
+
+
+def run_model(args, model, tok):
+    """Sweep every scenario x condition (x trials) through a real OpenAI-compatible model and
+    append the episodes to results/model_runs.jsonl (kept separate from the curated data)."""
+    runner = OpenAICompatRunner(base_url=_arg(args, "--url"), model=model,
+                                api_key=_arg(args, "--api-key"))
+    trials = int(_arg(args, "--trials", "1"))
+    limit = _arg(args, "--limit")
+    scenarios = SCENARIOS[: int(limit)] if limit else SCENARIOS
+    out = os.path.join(os.path.dirname(RESULTS), "model_runs.jsonl")
+
+    print(f"runner: {runner.name}  url: {runner.base_url}  tokenizer: {tok}  trials: {trials}\n")
+    episodes = []
+    for scn in scenarios:
+        for cond in CONDITIONS:
+            for t in range(trials):
+                try:
+                    ep = run_episode(scn, cond, runner, tok)
+                    episodes.append(ep)
+                    print(f"  {scn.name:22} {cond:5} t{t + 1}: "
+                          f"{'pass' if ep.outcome_pass else 'FAIL'} "
+                          f"ctx={ep.context_tokens} ret={ep.retrieved_tokens} "
+                          f"pulls={len(ep.retrieved_ids)}")
+                except Exception as e:  # network/endpoint/parse errors: log and continue
+                    print(f"  {scn.name:22} {cond:5} t{t + 1}: ERROR {type(e).__name__}: {e}")
+    append_jsonl(out, episodes)
+    print()
+    print(report([e.to_json() for e in episodes]))
+    print(f"\n{len(episodes)} episodes -> {os.path.relpath(out)}")
+
+
 def main():
     args = sys.argv[1:]
     if "--compare-tokenizers" in args:
         compare_tokenizers()
         return
 
-    tok = tokenizers.default()
-    if "--tokenizer" in args:
-        tok = args[args.index("--tokenizer") + 1]
+    tok = _arg(args, "--tokenizer") or tokenizers.default()
+
+    model = _arg(args, "--model")
+    if model:
+        run_model(args, model, tok)
+        return
 
     os.makedirs(os.path.dirname(RESULTS), exist_ok=True)
     open(RESULTS, "w").close()
