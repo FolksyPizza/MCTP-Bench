@@ -6,10 +6,11 @@ scores — so analysis and pricing can be redone later without re-running any mo
 
 ## Principles
 
-- Capture raw first. Store the exact request sent to the model and the complete, unmodified
-  server response(s) — including the timestamped stream of output chunks — verbatim. Parsed
-  fields (the extracted answer, reasoning, token counts, timing) are conveniences derived from the
-  raw capture and never replace it, so any later analysis can be redone from the bare data.
+- Capture raw and parsed, additively. Store the exact request(s), the complete unmodified server
+  response(s), and the timestamped output stream verbatim, AND the parsed/derived fields (extracted
+  answer, reasoning, token counts, timing) alongside them. Both are kept: the parsed fields make
+  analysis convenient, and the raw capture guarantees any analysis, scoring, or pricing can be
+  redone from the bare data. Nothing is discarded.
 - Record everything, score and price later. Each run captures its full input, output, reasoning,
   token counts, and timing at run time, plus an objective pass/fail where the suite provides a
   scorer. Judge scores and cost are computed in separate passes over the stored records, so we
@@ -55,8 +56,8 @@ One record per (suite, task, condition, model, trial):
 }
 ```
 
-The parsed fields above are conveniences; the authoritative data is the raw capture referenced by
-`raw_ref` (see below).
+The parsed fields above are kept for convenient analysis; the raw capture referenced by `raw_ref`
+is stored alongside them as the authoritative source (see below). Both are retained.
 
 ## Raw capture
 
@@ -98,6 +99,19 @@ results/
 `results/runs/`, `results/raw/`, and `results/outputs/` are gitignored (large) and published as a
 dataset release; `results/aggregates/` and `results/configs/` are committed so the paper's tables
 are reproducible.
+
+## Execution
+
+For large-scale gathering the harness runs co-located with the model server on the GPU host: it
+queries the local endpoint (no network tunnel), streams responses with low latency, and writes all
+raw data and records to the host's disk (hundreds of GB free). Long sweeps run detached so they
+survive disconnects. Only the small committed artifacts (`results/aggregates/`, `results/configs/`)
+are synced back to the repository; the large raw dataset (`results/runs|raw|outputs/`) stays on the
+host and is published as a dataset release. Development and calibration may run the harness remotely
+against a tunneled endpoint, but the recorded runs are produced on the host.
+
+This requires the MCTP and MCTP-Bench repositories and a Python environment (with the tokenizer
+dependency) on the host, alongside the model server.
 
 ## Objective scoring (at run time)
 
