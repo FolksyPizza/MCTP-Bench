@@ -20,7 +20,9 @@ python3 run.py --model Qwen/Qwen2.5-32B-Instruct-AWQ --url http://SERVER:8000/v1
 `results/model_runs.jsonl`, separate from the curated data. Configure via flags or the
 `MCTP_MODEL_URL`, `MCTP_MODEL`, and `MCTP_API_KEY` environment variables; the runner handles the
 `RETRIEVE <id>` retrieve-on-demand round. `--limit N` runs only the first N scenarios (smoke
-test).
+test). For reasoning models, raise the generation budget with `--max-tokens 4096` (or the
+`MCTP_MAX_TOKENS` env var) so they finish thinking and reach the final answer; the runner reads
+the answer from `content` and falls back to a `reasoning` field when present.
 
 The harness requires the Core MCTP package, located via `MCTP_HOME` (default: sibling
 `../MCTP`). Override for a different checkout: `MCTP_HOME=/path/to/MCTP python3 run.py`.

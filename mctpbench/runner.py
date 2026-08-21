@@ -74,14 +74,18 @@ class OpenAICompatRunner:
     MCTP_MODEL, MCTP_API_KEY (default "EMPTY"; vLLM/Ollama ignore it)."""
 
     def __init__(self, base_url=None, model=None, api_key=None, question=None,
-                 temperature=0.0, max_tokens=900, max_retrieve_rounds=1, timeout=180):
+                 temperature=0.0, max_tokens=None, max_retrieve_rounds=1, timeout=300):
         self.base_url = (base_url or os.environ.get("MCTP_MODEL_URL",
                                                     "http://localhost:8000/v1")).rstrip("/")
         self.model = model or os.environ.get("MCTP_MODEL", "")
         self.api_key = api_key or os.environ.get("MCTP_API_KEY", "EMPTY")
         self.question = question or DEFAULT_QUESTION
         self.temperature = temperature
-        self.max_tokens = max_tokens
+        # Reasoning models spend most of the budget on hidden thinking before the answer; if the
+        # cap is hit mid-thought the final answer is never produced. Non-reasoning models stop
+        # early regardless, so a generous default is safe. Raise it (flag or MCTP_MAX_TOKENS) for
+        # heavy reasoners (e.g. 4096+).
+        self.max_tokens = int(max_tokens or os.environ.get("MCTP_MAX_TOKENS", 2048))
         self.max_retrieve_rounds = max_retrieve_rounds
         self.timeout = timeout
         self.name = f"model:{self.model}" if self.model else "model"
@@ -98,7 +102,20 @@ class OpenAICompatRunner:
         )
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             data = json.loads(resp.read())
-        return data["choices"][0]["message"]["content"]
+        return self._answer_text(data["choices"][0]["message"])
+
+    @staticmethod
+    def _answer_text(msg: dict) -> str:
+        """Extract the final answer, handling reasoning models: strip any <think>...</think>
+        block from content, and fall back to a separate reasoning field if content is empty
+        (some servers, e.g. Ollama for qwen3, put chain-of-thought in `reasoning`)."""
+        content = re.sub(r"(?is)<think>.*?</think>", "", msg.get("content") or "").strip()
+        if content:
+            return content
+        for key in ("reasoning", "reasoning_content", "thinking"):
+            if msg.get(key):
+                return str(msg[key]).strip()
+        return ""
 
     def run(self, task: str, context: str, retrievable: dict) -> RunResult:
         system = ("You continue another agent's work. Use only the provided context; do not "

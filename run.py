@@ -107,7 +107,8 @@ def run_model(args, model, tok):
     """Sweep every scenario x condition (x trials) through a real OpenAI-compatible model and
     append the episodes to results/model_runs.jsonl (kept separate from the curated data)."""
     runner = OpenAICompatRunner(base_url=_arg(args, "--url"), model=model,
-                                api_key=_arg(args, "--api-key"))
+                                api_key=_arg(args, "--api-key"),
+                                max_tokens=_arg(args, "--max-tokens"))
     trials = int(_arg(args, "--trials", "1"))
     limit = _arg(args, "--limit")
     scenarios = SCENARIOS[: int(limit)] if limit else SCENARIOS
