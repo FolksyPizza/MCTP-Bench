@@ -40,7 +40,8 @@ One record per (suite, task, condition, model, trial):
   # output — everything the model produced
   "output_ref": "outputs/<run_id>.out.txt",      # the final answer text
   "reasoning_ref": "outputs/<run_id>.think.txt", # chain-of-thought, if any
-  "prompt_tokens": 503, "reasoning_tokens": 1840, "output_tokens": 240,
+  "prompt_tokens": 503, "reasoning_tokens": 1840, "output_tokens": 240,  # model's native tokenizer
+  "ref_token_counts": {"tiktoken:o200k_base": {...}, "tiktoken:cl100k_base": {...}, "hf:<model>": {...}},
 
   # timing (see below)
   "t_start": 0.0, "ttft_s": 0.31, "t_end": 6.7, "latency_s": 6.7,
@@ -73,6 +74,16 @@ For every run, stored verbatim and never post-processed at capture time:
 Everything else in the record (extracted answer, reasoning, token counts, timing, scores) is
 derived from this raw capture, so analysis, scoring, and pricing can be redone from the bare data
 without re-running any model.
+
+## Tokenization
+
+Token counts are recorded two ways. The model's native counts come from the server's `usage`
+field — the model's own tokenizer — and are authoritative for that model's cost; on the GPU host
+the model's Hugging Face tokenizer is available and is used when the server does not report usage.
+In addition, reference counts are computed over the same text with a fixed set of tokenizers
+(the tiktoken encodings and selected model tokenizers) so token amounts are comparable across
+models that tokenize differently. Each record logs the exact model id, size, digest, and start
+time, so every count is attributable to a specific model at a specific moment.
 
 Large text (prompt, output, reasoning, timeline) is stored as referenced files so the JSONL stays
 scannable; small deployments may inline them.
