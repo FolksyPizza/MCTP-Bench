@@ -1,0 +1,109 @@
+# MCTP-Bench Data Model
+
+What every benchmark run records, how it is stored, and how it is scored. The goal is to preserve
+everything — full model output, chain-of-thought, token counts, second-by-second timing, and
+scores — so analysis and pricing can be redone later without re-running any model.
+
+## Principles
+
+- Record everything, score and price later. Each run captures its full input, output, reasoning,
+  token counts, and timing at run time, plus an objective pass/fail where the suite provides a
+  scorer. Judge scores and cost are computed in separate passes over the stored records, so we
+  never re-run models to re-score or re-price.
+- Immutable and append-only. Run records are never edited; derived judge scores and aggregates
+  reference them by `run_id`.
+
+## The run record
+
+One record per (suite, task, condition, model, trial):
+
+```
+{
+  "run_id": "<uuid>",
+  "suite": "swebench", "task_id": "...", "tier": "large",
+  "condition": "mctp",               # transcript | summary | rag | mctp | mctp-learned
+  "model": "qwen3.6:35b", "model_size_b": 35, "reasoning": true,
+  "trial": 1, "started_at": "<iso8601>",
+
+  # input delivered to the receiver
+  "prompt_ref": "outputs/<run_id>.prompt.txt",   # large text stored as a file
+  "context_tokens": 503, "packet_node_ids": [...],
+
+  # MCTP behavior
+  "retrieved_ids": [...], "retrieved_tokens": 325, "codebase_reads": 0,
+
+  # output — everything the model produced
+  "output_ref": "outputs/<run_id>.out.txt",      # the final answer text
+  "reasoning_ref": "outputs/<run_id>.think.txt", # chain-of-thought, if any
+  "prompt_tokens": 503, "reasoning_tokens": 1840, "output_tokens": 240,
+
+  # timing (see below)
+  "t_start": 0.0, "ttft_s": 0.31, "t_end": 6.7, "latency_s": 6.7,
+  "timeline_ref": "outputs/<run_id>.timeline.jsonl",
+
+  # objective score (suite scorer, when one exists)
+  "objective_pass": true, "objective_detail": {...},
+
+  # provenance / reproducibility
+  "runner": "vllm", "endpoint": "...", "temperature": 0.0, "seed": 1,
+  "model_digest": "...", "harness_commit": "..."
+}
+```
+
+Large text (prompt, output, reasoning, timeline) is stored as referenced files so the JSONL stays
+scannable; small deployments may inline them.
+
+## Timing (second-by-second)
+
+Runs use the streaming API so each generated chunk is timestamped. `timeline_ref` points to a
+JSONL of `[offset_seconds, text]` entries, from which time-to-first-token, tokens/second, and a
+reconstruction of exactly what each condition had produced at any moment are derived. This
+supports "which condition was ahead" analysis over the course of a run.
+
+## Storage layout
+
+```
+results/
+  runs/         run records, sharded JSONL: <suite>/<model>/<condition>.jsonl
+  outputs/      referenced text: prompts, outputs, reasoning, token timelines
+  judge/        ensemble judge scores, one record per (run_id, judge_model)
+  aggregates/   computed tables and analysis graphs
+  configs/      exact batch configs: models, seeds, prompts, suite + harness versions
+```
+
+`results/runs/` and `results/outputs/` are gitignored (large) and published as a dataset release;
+`results/aggregates/` and `results/configs/` are committed so the paper's tables are reproducible.
+
+## Objective scoring (at run time)
+
+Where a suite has an objective scorer (unit tests, exact match), it runs when the record is
+written and sets `objective_pass`. Open-ended tasks are left unscored for the judge pass.
+
+## Ensemble judge (a separate pass, after all runs)
+
+After the runs complete, an ensemble of at least three judge models — chosen from different
+families to reduce self-preference bias — scores each output against the gold answer or a rubric.
+Each judge writes one record per run into `results/judge/`; the final score aggregates them
+(median or majority vote). The ensemble is validated against a human-labeled sample. This replaces
+keyword scoring, which a 27B model was already able to false-pass.
+
+## Cost and pricing (at analysis time)
+
+Cost is not stored; token counts are. Standard per-token prices are applied later from a pricing
+table, so pricing can change without re-running anything. Per-run cost =
+`prompt_tokens + reasoning_tokens + output_tokens`, plus the summarizer's tokens for the `summary`
+condition and embedding/retrieval for `rag`, priced per model.
+
+## Model tiers
+
+- Small / medium runs: 8–14B models.
+- Large / strongest tests: 27–35B models (no larger than 35B).
+- Judges: an ensemble of at least three, from mixed families.
+- Summarizer: the same model as the receiver (an agent summarizing its own state); its inference
+  is counted in the `summary` condition's cost.
+
+## Build note
+
+The current runner is non-streaming, so token timelines are not yet captured. A streaming runner
+mode is required to populate `timeline_ref`, `ttft_s`, and per-token timing; it is the first build
+before any recorded run.

@@ -28,8 +28,9 @@ Every scenario is evaluated under at least two conditions:
 Two further baselines are planned so MCTP is compared against strong alternatives rather than
 only a raw dump:
 
-- `summary` — an LLM condenses Agent A's context into a handoff. The summarizer's own inference
-  cost is counted in the total, not just the summary's token size.
+- `summary` — the same model as the receiver condenses Agent A's context into a handoff (an agent
+  summarizing its own state); the summarizer's inference cost is counted in the total, not just
+  the summary's token size.
 - `rag` — the same source is stored and fetched with conventional vector retrieval.
 
 Total cost for every condition is accounted the same way: Agent A inference + any preparation
@@ -121,6 +122,13 @@ independent tasks across a range of context sizes:
 - High context: real-repository and long-context tasks — SWE-bench / SWE-bench Verified (GitHub
   issue-to-patch on large repositories), RepoBench, and long-context suites (LongBench-style).
   This is the regime where MCTP is expected to help most.
+- Subagent / swarm: multi-agent pipelines (for example research → implementation → testing) and
+  model-to-model handoffs, where accumulated inter-agent state is largest.
+
+Model sizing per tier: 8–14B models for the small and medium tiers, 27–35B for the largest and
+strongest tests (no larger than 35B). Both tracks proceed in parallel — the extractor, needed for
+the high-context suites where MCTP is expected to help most, and the low-context suites, which
+validate the pipeline, baselines, and scoring even though MCTP's advantage there is small.
 
 Each external suite needs an adapter that (1) builds an MCTP graph from the task's repository or
 context, (2) constructs the `flat` baseline from the same source, (3) runs both conditions
@@ -161,12 +169,13 @@ results/          episodes (JSONL) and analysis outputs
   vector-retrieval context; or the MCTP packet with retrieve-on-demand. `mctp-learned` is added
   once the reranker exists.
 - Two-layer scoring: task success comes from the suite's objective scorer where one exists (unit
-  tests, exact match) and from an LLM judge for open-ended answers — replacing the in-house
-  keyword checks, which a 27B model was already able to false-pass. Behavioral metrics (tokens
-  transferred, retrievals, preservation vs. exposure, cost, latency) are logged alongside.
-- Cost accounting: the episode record is extended with output/reasoning tokens so total cost
-  counts generation — essential for reasoning models, where thinking dominates and structured
-  state may change the cost/benefit balance.
+  tests, exact match) and, for open-ended answers, from an ensemble of at least three judge models
+  scored in a separate pass after all runs complete — replacing the in-house keyword checks, which
+  a 27B model was already able to false-pass. Behavioral metrics (tokens transferred, retrievals,
+  preservation vs. exposure, cost, latency) are logged alongside.
+- Full per-run recording — inputs, outputs, chain-of-thought, token counts, and second-by-second
+  timing — is specified in [DATA-MODEL.md](DATA-MODEL.md). Cost is not stored; token counts are,
+  and standard prices are applied at analysis time so pricing can change without re-running.
 
 CLI shape:
 
