@@ -6,6 +6,10 @@ scores — so analysis and pricing can be redone later without re-running any mo
 
 ## Principles
 
+- Capture raw first. Store the exact request sent to the model and the complete, unmodified
+  server response(s) — including the timestamped stream of output chunks — verbatim. Parsed
+  fields (the extracted answer, reasoning, token counts, timing) are conveniences derived from the
+  raw capture and never replace it, so any later analysis can be redone from the bare data.
 - Record everything, score and price later. Each run captures its full input, output, reasoning,
   token counts, and timing at run time, plus an objective pass/fail where the suite provides a
   scorer. Judge scores and cost are computed in separate passes over the stored records, so we
@@ -46,9 +50,28 @@ One record per (suite, task, condition, model, trial):
 
   # provenance / reproducibility
   "runner": "vllm", "endpoint": "...", "temperature": 0.0, "seed": 1,
-  "model_digest": "...", "harness_commit": "..."
+  "model_digest": "...", "harness_commit": "...",
+  "raw_ref": "raw/<run_id>.jsonl"    # verbatim request(s) + full response(s) + streamed chunks
 }
 ```
+
+The parsed fields above are conveniences; the authoritative data is the raw capture referenced by
+`raw_ref` (see below).
+
+## Raw capture
+
+For every run, stored verbatim and never post-processed at capture time:
+
+- The exact request payload(s) sent to the model server — messages, model, temperature, seed,
+  `max_tokens`, and any other parameters — for the initial call and each retrieve-on-demand round.
+- The complete server response object(s) as received — all fields, including `usage`, `finish_reason`,
+  any `reasoning`/`thinking` field, and provider-specific extras — nothing dropped.
+- The timestamped output stream: every streamed chunk with the wall-clock offset at which it
+  arrived, so the exact text present at any second of the run is reconstructable.
+
+Everything else in the record (extracted answer, reasoning, token counts, timing, scores) is
+derived from this raw capture, so analysis, scoring, and pricing can be redone from the bare data
+without re-running any model.
 
 Large text (prompt, output, reasoning, timeline) is stored as referenced files so the JSONL stays
 scannable; small deployments may inline them.
@@ -65,14 +88,16 @@ supports "which condition was ahead" analysis over the course of a run.
 ```
 results/
   runs/         run records, sharded JSONL: <suite>/<model>/<condition>.jsonl
-  outputs/      referenced text: prompts, outputs, reasoning, token timelines
+  raw/          verbatim request payload(s), full server response(s), and streamed chunks per run
+  outputs/      referenced text derived from raw: prompts, answers, reasoning, token timelines
   judge/        ensemble judge scores, one record per (run_id, judge_model)
   aggregates/   computed tables and analysis graphs
   configs/      exact batch configs: models, seeds, prompts, suite + harness versions
 ```
 
-`results/runs/` and `results/outputs/` are gitignored (large) and published as a dataset release;
-`results/aggregates/` and `results/configs/` are committed so the paper's tables are reproducible.
+`results/runs/`, `results/raw/`, and `results/outputs/` are gitignored (large) and published as a
+dataset release; `results/aggregates/` and `results/configs/` are committed so the paper's tables
+are reproducible.
 
 ## Objective scoring (at run time)
 
