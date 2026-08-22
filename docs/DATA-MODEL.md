@@ -152,8 +152,21 @@ condition and embedding/retrieval for `rag`, priced per model.
 - Summarizer: the same model as the receiver (an agent summarizing its own state); its inference
   is counted in the `summary` condition's cost.
 
-## Build note
+## Implementation
 
-The current runner is non-streaming, so token timelines are not yet captured. A streaming runner
-mode is required to populate `timeline_ref`, `ttft_s`, and per-token timing; it is the first build
-before any recorded run.
+The run store and streaming runner are implemented:
+
+- `mctpbench/streaming.py` — `StreamingRunner` runs a model over the OpenAI-compatible endpoint
+  with `stream=true`, capturing the exact request(s), every streamed chunk with its wall-clock
+  offset, the server's `usage` block (native token counts), and the assembled answer/reasoning.
+  It populates `timeline_ref`, `ttft_s`, and per-token timing, and handles the retrieve-on-demand
+  rounds.
+- `mctpbench/records.py` — `RunRecord` (the schema above) and `ResultStore`, which writes the raw
+  capture, the referenced text under `outputs/`, the reference token counts, and the parsed record
+  into the storage tree.
+- `run_benchmark.py` — the matrix runner (suite × models × conditions × trials) that assembles and
+  writes each record; `--dry-run` exercises the whole pipeline with a deterministic runner and no
+  server. `analyze.py` applies pricing and writes the committed aggregates.
+
+The ensemble judge (`scoring/judge.py`) is a separate pass over the stored records, run after the
+model runs complete.

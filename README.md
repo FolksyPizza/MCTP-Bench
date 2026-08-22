@@ -36,16 +36,29 @@ to count with it; under the system interpreter only the heuristic is available.
 
 ```
 mctpbench/
-  episode.py      # episode record and JSONL logging
+  episode.py      # episode record and JSONL logging (in-house scenario path)
   conditions.py   # build flat vs mctp context from a scenario (Core selector/transfer)
-  runner.py       # AgentRunner interface: MockRunner (deterministic) and RunResult
+  runner.py       # AgentRunner interface: MockRunner + OpenAICompatRunner
+  streaming.py    # StreamingRunner: raw capture + per-token timeline + native usage
+  records.py      # RunRecord schema and ResultStore (the storage tree)
   harness.py      # run_episode(...) and record_real(...) for model-in-the-loop runs
   scoring.py      # aggregate report grouped by (scenario, condition, runner)
   tokenizers.py   # token counting: heuristic, tiktoken encodings, optional Hugging Face
 scenarios/       # ten scenarios; see docs/SCENARIOS.md for what each does
-run.py           # CLI entry point
-results/         # episodes.jsonl and verbatim agent transcripts
+adapters/        # suite adapters: humaneval.py (unit-test scorer), inhouse.py (the ten controls)
+conditions/      # builders: transcript, summary (same-model), rag (TF-IDF), mctp (Core packet)
+scoring/         # objective scorers (unit tests / exact match) + the ensemble judge
+run.py           # in-house scenario CLI
+run_benchmark.py # large-scale matrix runner (suite x models x conditions x trials)
+analyze.py       # pricing + committed aggregate tables
+scripts/         # host setup and dataset fetch (run on the GPU host)
+results/         # the storage tree (see docs/DATA-MODEL.md)
 ```
+
+The large-scale framework (`run_benchmark.py`, `adapters/`, `conditions/`, `scoring/`) records
+full raw + parsed data per run; see [docs/BENCHMARK.md](docs/BENCHMARK.md) and
+[docs/DATA-MODEL.md](docs/DATA-MODEL.md). Validate it offline with no server via
+`python run_benchmark.py --suite humaneval --dry-run`.
 
 ## Conditions
 

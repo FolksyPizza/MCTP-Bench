@@ -2,3 +2,14 @@ __pycache__/
 *.pyc
 .venv/
 results/model_runs.jsonl
+
+# Large dataset-release outputs: raw capture, referenced text, per-run records, judge scores.
+# Published as a dataset release, not committed. Aggregates and configs ARE committed.
+results/runs/
+results/raw/
+results/outputs/
+results/judge/
+
+# External datasets fetched to the host (the small bundled sample IS committed).
+data/HumanEval.jsonl
+data/*.jsonl.gz

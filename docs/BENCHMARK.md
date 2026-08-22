@@ -146,44 +146,60 @@ Alongside scale, multi-trial runs and human- or judge-validated scoring will mov
 single-trial existence checks to statistically meaningful ones, and additional model families
 will provide cross-model-family evidence.
 
-## Framework (planned structure for large-scale runs)
+## Framework (large-scale runs)
 
-The current harness (`mctpbench/`) runs the in-house scenarios. Scaling to OSS suites adds a thin
-layer around the same episode and scoring core:
+The original harness (`mctpbench/`) runs the in-house scenarios through the two-condition
+`episode` path. The large-scale framework wraps the same core in a thin layer and records full
+per-run data:
 
 ```
-mctpbench/        harness core: episode, conditions, runner, scoring, tokenizers
+mctpbench/        harness core: streaming runner, run records + store, tokenizers, episode
 scenarios/        in-house control scenarios (diagnostics with known ground truth)
-adapters/         OSS suite adapters (humaneval.py, swebench.py, ...): task -> source + gold scorer
-conditions/       baseline builders (transcript, summary, rag, mctp): source -> receiver input
-scoring/          suite scorers (unit tests / exact match) plus an LLM judge for open answers
-run_benchmark.py  the matrix CLI
-results/          episodes (JSONL) and analysis outputs
+adapters/         suite adapters (humaneval.py, inhouse.py, ...): task -> Source + gold scorer
+conditions/       builders (transcript, summary, rag, mctp): Source -> receiver input
+scoring/          objective scorers (unit tests / exact match) + the ensemble judge
+run_benchmark.py  the matrix runner
+analyze.py        pricing + committed aggregate tables
+results/          the storage tree (see DATA-MODEL.md)
 ```
 
-- Adapter contract: for a suite, an adapter yields per task an id, the task prompt, the source
-  context (a repository snapshot or a transcript), and the suite's own scorer (for example, "do
-  the repository's tests pass?"). Adapters turn an external suite into MCTP inputs.
-- Condition builders: each of `transcript`, `summary`, `rag`, `mctp` takes the same source and
-  produces the receiver's input — the raw transcript; an LLM summary (its inference counted); a
-  vector-retrieval context; or the MCTP packet with retrieve-on-demand. `mctp-learned` is added
-  once the reranker exists.
+- Adapter contract (`adapters/base.py`): an adapter yields per task an id, the `Source` (the task
+  plus its transferable prior context — a transcript, a doc corpus, or a prebuilt MCTP graph), the
+  receiver instruction, an objective scorer where the suite has one, and a gold answer or rubric
+  for the judge pass. `humaneval` (objective unit-test scorer) and `inhouse` (the ten controls)
+  are implemented; SWE-bench and long-context suites follow the extractor.
+- Condition builders (`conditions/`): each of `transcript`, `summary`, `rag`, `mctp` takes the
+  same `Source` and produces the receiver's input — the raw transcript; a same-model summary (its
+  inference counted as `prep_tokens`); a lexically-retrieved context (TF-IDF, dependency-free);
+  or the Core selector packet with retrieve-on-demand. When a task carries no prior context (a
+  stateless suite such as HumanEval) the conditions coincide, which is the intended Phase-0
+  pipeline check. `mctp-learned` is added once the reranker exists.
 - Two-layer scoring: task success comes from the suite's objective scorer where one exists (unit
-  tests, exact match) and, for open-ended answers, from an ensemble of at least three judge models
-  scored in a separate pass after all runs complete — replacing the in-house keyword checks, which
-  a 27B model was already able to false-pass. Behavioral metrics (tokens transferred, retrievals,
-  preservation vs. exposure, cost, latency) are logged alongside.
-- Full per-run recording — inputs, outputs, chain-of-thought, token counts, and second-by-second
-  timing — is specified in [DATA-MODEL.md](DATA-MODEL.md). Cost is not stored; token counts are,
-  and standard prices are applied at analysis time so pricing can change without re-running.
+  tests, exact match), run at record time; for open-ended answers, from an ensemble of at least
+  three judge models (`scoring/judge.py`) scored in a separate pass after all runs complete —
+  replacing the in-house keyword checks, which a 27B model was already able to false-pass.
+  Behavioral metrics (tokens transferred, retrievals, cost, latency) are logged alongside.
+- Full per-run recording — inputs, outputs, chain-of-thought, native + reference token counts, and
+  second-by-second timing — is implemented per [DATA-MODEL.md](DATA-MODEL.md). Cost is not stored;
+  token counts are, and standard prices are applied by `analyze.py` so pricing can change without
+  re-running.
 
-CLI shape:
+Running it:
 
 ```
-python run_benchmark.py --suite humaneval --models gemma3:27b,qwen3.6:35b \
-    --conditions transcript,summary,rag,mctp --trials 3 --serve vllm
-python analyze.py    # regenerate the headline graphs
+# validate the whole pipeline offline, no server (deterministic MockRunner):
+python run_benchmark.py --suite humaneval --dry-run
+
+# start the model server (unprivileged venv), then run against it:
+python -m vllm.entrypoints.openai.api_server --model <hf-model> --port 8000 \
+    --tensor-parallel-size 2 --max-model-len 8192
+python run_benchmark.py --suite humaneval --models <model-id> \
+    --conditions transcript,mctp --trials 3 --url http://localhost:8000/v1
+python analyze.py    # pricing + aggregate tables
 ```
+
+Host preparation is scripted in `scripts/setup_host.sh` (clone + venv + vLLM, no model load) and
+`scripts/fetch_datasets.sh` (external datasets into `data/`).
 
 Phasing: (0) low-context OSS (HumanEval, MBPP) end to end with all four conditions, judge
 scoring, and cost accounting, served by vLLM; (1) multi-trial, more models, and context buckets —
