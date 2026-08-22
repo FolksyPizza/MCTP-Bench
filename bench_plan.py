@@ -46,8 +46,8 @@ class Wave:
 
 SUITES = [
     Suite("humaneval", "low", 164, LOW, phase=0, ready=True, objective=True),
-    Suite("mbpp", "low", 500, LOW, phase=0, ready=False, objective=True),
-    Suite("gsm8k", "low", 500, LOW, phase=0, ready=False, objective=True),
+    Suite("mbpp", "low", 500, LOW, phase=0, ready=True, objective=True),
+    Suite("gsm8k", "low", 500, LOW, phase=0, ready=True, objective=True),
     Suite("inhouse", "medium", 10, FOUR, phase=1, ready=True, objective=False),
     Suite("medium_multifile", "medium", 300, FOUR, phase=1, ready=False, objective=False),
     Suite("swebench", "high", 500, FOUR, phase=2, ready=False, objective=True),

@@ -45,9 +45,10 @@ mctpbench/
   scoring.py      # aggregate report grouped by (scenario, condition, runner)
   tokenizers.py   # token counting: heuristic, tiktoken encodings, optional Hugging Face
 scenarios/       # ten scenarios; see docs/SCENARIOS.md for what each does
-adapters/        # suite adapters: humaneval.py (unit-test scorer), inhouse.py (the ten controls)
+adapters/        # suite adapters: humaneval, mbpp, gsm8k (objective scorers), inhouse (controls)
 conditions/      # builders: transcript, summary (same-model), rag (TF-IDF), mctp (Core packet)
-scoring/         # objective scorers (unit tests / exact match) + the ensemble judge
+scoring/         # objective scorers (unit tests / exact match) + cross-review ensemble judge
+extraction/      # repo -> MCTP graph: heuristic.py (deterministic floor), llm.py (the ceiling)
 run.py           # in-house scenario CLI
 run_benchmark.py # large-scale matrix runner (suite x models x conditions x trials)
 bench_plan.py    # the run plan: suites, model waves, trials, total run count

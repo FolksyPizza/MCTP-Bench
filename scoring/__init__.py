@@ -6,6 +6,12 @@ ensemble judge runs as a separate pass over the stored records, after all model 
 """
 from __future__ import annotations
 
-from .objective import exact_match, extract_code, humaneval_scorer
+from .objective import (
+    exact_match,
+    extract_code,
+    gsm8k_scorer,
+    humaneval_scorer,
+    mbpp_scorer,
+)
 
-__all__ = ["exact_match", "extract_code", "humaneval_scorer"]
+__all__ = ["exact_match", "extract_code", "gsm8k_scorer", "humaneval_scorer", "mbpp_scorer"]

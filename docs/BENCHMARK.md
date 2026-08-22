@@ -166,8 +166,15 @@ results/          the storage tree (see DATA-MODEL.md)
 - Adapter contract (`adapters/base.py`): an adapter yields per task an id, the `Source` (the task
   plus its transferable prior context — a transcript, a doc corpus, or a prebuilt MCTP graph), the
   receiver instruction, an objective scorer where the suite has one, and a gold answer or rubric
-  for the judge pass. `humaneval` (objective unit-test scorer) and `inhouse` (the ten controls)
-  are implemented; SWE-bench and long-context suites follow the extractor.
+  for the judge pass. `humaneval` and `mbpp` (unit-test scorers), `gsm8k` (exact-match), and
+  `inhouse` (the ten controls) are implemented; SWE-bench and long-context suites follow once the
+  extractor is applied to their repositories.
+- Extraction (`extraction/`): turning a real repository into an MCTP graph — the system's ceiling,
+  since a linking miss here (not the selector) is what fails MCTP. `HeuristicExtractor` is the
+  deterministic floor (files -> artifact nodes with parsed symbols and import-derived `depends_on`
+  edges; the task linked to the files it names). `LLMExtractor` is the ceiling (a model emits the
+  full node/edge vocabulary, including decisions and superseded approaches), validated against the
+  closed v0.1 vocabulary. The heuristic extractor runs offline; the LLM extractor needs the server.
 - Condition builders (`conditions/`): each of `transcript`, `summary`, `rag`, `mctp` takes the
   same `Source` and produces the receiver's input — the raw transcript; a same-model summary (its
   inference counted as `prep_tokens`); a lexically-retrieved context (TF-IDF, dependency-free);

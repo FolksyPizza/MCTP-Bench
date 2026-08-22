@@ -65,6 +65,46 @@ def humaneval_scorer(problem: dict):
     return score
 
 
+def mbpp_scorer(problem: dict):
+    """problem: an MBPP record with `code`, `test_list`, and optional `test_setup_code`."""
+    setup = problem.get("test_setup_code", "")
+    tests = "\n".join(problem["test_list"])
+
+    def score(answer: str) -> tuple:
+        code = extract_code(answer)
+        program = f"{code}\n\n{setup}\n\n{tests}\n"
+        return _run_python(program)
+
+    return score
+
+
+_NUM = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
+
+
+def _final_number(text: str):
+    """The final numeric answer: prefer a value after '####' or 'answer is', else the last
+    number in the text. Returns a normalized string or None."""
+    m = re.search(r"####\s*(-?\d[\d,]*(?:\.\d+)?)", text or "")
+    if not m:
+        m = re.search(r"(?i)answer(?:\s+is)?[:\s]+(-?\d[\d,]*(?:\.\d+)?)", text or "")
+    if m:
+        return m.group(1).replace(",", "")
+    nums = _NUM.findall(text or "")
+    return nums[-1].replace(",", "") if nums else None
+
+
+def gsm8k_scorer(problem: dict):
+    """problem: a GSM8K record with `answer` ending in '#### <final number>'."""
+    gold = _final_number(problem["answer"])
+
+    def score(answer: str) -> tuple:
+        pred = _final_number(answer)
+        ok = pred is not None and gold is not None and float(pred) == float(gold)
+        return ok, {"gold": gold, "pred": pred}
+
+    return score
+
+
 def _normalize(s: str) -> str:
     return re.sub(r"\s+", " ", s.strip().lower())
 

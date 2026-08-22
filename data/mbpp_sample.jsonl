@@ -1,0 +1,2 @@
+{"task_id": 1, "text": "Write a function to return the sum of two numbers.", "code": "def add(a, b):\n    return a + b\n", "test_list": ["assert add(2, 3) == 5", "assert add(-1, 1) == 0", "assert add(0, 0) == 0"], "test_setup_code": ""}
+{"task_id": 2, "text": "Write a function to check whether a given number is even.", "code": "def is_even(n):\n    return n % 2 == 0\n", "test_list": ["assert is_even(4) == True", "assert is_even(7) == False", "assert is_even(0) == True"], "test_setup_code": ""}

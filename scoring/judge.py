@@ -4,14 +4,18 @@ Scoring is deferred: all receiver runs are recorded first (raw + parsed), then t
 them without re-running any receiver. The pass has three stages, and stores every judge
 input/output so the scoring itself is auditable and re-aggregatable:
 
-1. Independent scoring. Each of several judge models (mixed families, to reduce self-preference
-   bias) scores each output `samples_per_judge` times at nonzero temperature. Two samples per
-   model expose a judge's own instability.
-2. Cross-review. Each judge is shown the other judges' assessments and asked to critique them
-   and give a final judgment. This surfaces disagreement and lets a judge correct an outlier.
-3. Aggregation. The final label is the majority vote over the post-review pass/fail and the
-   median of the post-review scores; inter-judge disagreement and the round-1→round-2 shift are
-   recorded alongside.
+1. Independent scoring (the PRIMARY label). Each of several judge models (mixed families, to
+   reduce self-preference bias) scores each output `samples_per_judge` times at nonzero
+   temperature. Each judge is reduced to one verdict (median score, majority pass); the panel
+   aggregates those by majority/median. This is the reported metric — a panel of mixed-family
+   judges — and it is validated against a human-labeled sample. Two samples per judge expose the
+   judge's own instability.
+2. Cross-review (a SECONDARY signal). Each judge is then shown the other judges' assessments and
+   asked to critique them and give a final judgment. This is reported as an ablation — how often
+   peer critique flips the panel and how far scores shift — not as the ground truth, because
+   showing peers' verdicts introduces anchoring. It can be disabled (`cross_review=False`).
+3. Aggregation. The panel label and its disagreement/instability are primary; the post-review
+   label, whether it flips the panel, and the score shift are recorded alongside as secondary.
 
 Judges are addressed through the same OpenAI-compatible endpoint as the receivers. Nothing is
 sent until `run_judge_pass` is called with a live endpoint.
@@ -80,22 +84,48 @@ def _num(v):
     return v if isinstance(v, (int, float)) else None
 
 
-def aggregate(round1: list, round2: list) -> dict:
-    """round1: per-sample score verdicts. round2: per-judge post-review verdicts."""
-    r1_scores = [_num(v.get("score")) for v in round1 if _num(v.get("score")) is not None]
-    r2_scores = [_num(v.get("final_score")) for v in round2
-                 if _num(v.get("final_score")) is not None]
-    r2_pass = [v.get("final_pass") for v in round2 if isinstance(v.get("final_pass"), bool)]
-    final_pass = (sum(r2_pass) > len(r2_pass) / 2) if r2_pass else None
+def _majority(bools: list):
+    bools = [b for b in bools if isinstance(b, bool)]
+    return (sum(bools) > len(bools) / 2) if bools else None
+
+
+def aggregate_panel(per_judge: dict) -> dict:
+    """PRIMARY label: the independent panel. Each judge is reduced to one verdict (median of
+    its samples for the score, majority for pass); the panel aggregates those. This is the
+    reported metric — a panel of mixed-family judges, majority/median — with cross-review kept
+    separate below so peer anchoring does not enter the headline number."""
+    judge_scores, judge_passes, within = [], [], []
+    for v in per_judge.values():
+        if v["scores"]:
+            judge_scores.append(median(v["scores"]))
+            within.append(pstdev(v["scores"]) if len(v["scores"]) > 1 else 0.0)
+        jp = _majority(v["passes"])
+        if jp is not None:
+            judge_passes.append(jp)
     return {
-        "final_pass": final_pass,
-        "final_score": median(r2_scores) if r2_scores else None,
-        "n_judges": len(round2),
-        "judge_disagreement": round(pstdev(r2_scores), 3) if len(r2_scores) > 1 else 0.0,
-        "sample_instability": round(pstdev(r1_scores), 3) if len(r1_scores) > 1 else 0.0,
-        "score_shift_after_review": (
-            round((median(r2_scores) - median(r1_scores)), 3)
-            if r1_scores and r2_scores else None),
+        "final_pass": _majority(judge_passes),                 # PRIMARY
+        "final_score": median(judge_scores) if judge_scores else None,
+        "n_judges": len(per_judge),
+        "judge_disagreement": round(pstdev(judge_scores), 3) if len(judge_scores) > 1 else 0.0,
+        "sample_instability": round(sum(within) / len(within), 3) if within else 0.0,
+    }
+
+
+def aggregate_review(round2: list, panel: dict) -> dict:
+    """SECONDARY signal: post cross-review. Reported as an ablation, not the ground truth."""
+    scores = [_num(v.get("final_score")) for v in round2
+              if _num(v.get("final_score")) is not None]
+    passes = [v.get("final_pass") for v in round2 if isinstance(v.get("final_pass"), bool)]
+    review_score = median(scores) if scores else None
+    shift = (round(review_score - panel["final_score"], 3)
+             if review_score is not None and panel.get("final_score") is not None else None)
+    return {
+        "review_pass": _majority(passes),
+        "review_score": review_score,
+        "review_flips_panel": (panel.get("final_pass") is not None
+                               and _majority(passes) is not None
+                               and _majority(passes) != panel["final_pass"]),
+        "score_shift_after_review": shift,
     }
 
 
@@ -104,32 +134,41 @@ def _others_blurb(per_judge: dict, exclude: str) -> str:
     for jm, v in per_judge.items():
         if jm == exclude:
             continue
-        lines.append(f"- {jm}: score={v.get('score')} pass={v.get('pass')} "
-                     f"reason={v.get('reason')!r}")
+        s = v["summary"]
+        lines.append(f"- {jm}: score={s.get('score')} pass={s.get('pass')} "
+                     f"reason={s.get('reason')!r}")
     return "\n".join(lines) or "(no other assessments)"
 
 
-def judge_one(judges: list, task: str, gold: str, answer: str, samples_per_judge: int) -> dict:
-    """Run the three stages for one output. Returns a full record including raw judge I/O."""
-    round1, per_judge_mean = [], {}
+def judge_one(judges: list, task: str, gold: str, answer: str, samples_per_judge: int,
+              cross_review: bool = True) -> dict:
+    """Score one output. Returns a full record including raw judge I/O. The primary label is
+    the independent panel; cross-review (if enabled) is a separate, secondary layer."""
+    round1, per_judge = [], {}
     for j in judges:
-        samples = []
+        scores, passes, first = [], [], None
         for s in range(samples_per_judge):
             verdict, raw = j.score(task, gold, answer)
-            entry = {"judge_model": j.model, "sample": s, "raw": raw, **verdict}
-            round1.append(entry)
-            samples.append(verdict)
-        # A judge's round-1 summary for its peers = its first parseable sample.
-        summary = next((v for v in samples if not v.get("_unparseable")), samples[0])
-        per_judge_mean[j.model] = summary
+            round1.append({"judge_model": j.model, "sample": s, "raw": raw, **verdict})
+            if _num(verdict.get("score")) is not None:
+                scores.append(verdict["score"])
+            if isinstance(verdict.get("pass"), bool):
+                passes.append(verdict["pass"])
+            if first is None and not verdict.get("_unparseable"):
+                first = verdict
+        per_judge[j.model] = {"scores": scores, "passes": passes, "summary": first or {}}
 
-    round2 = []
-    for j in judges:
-        others = _others_blurb(per_judge_mean, exclude=j.model)
-        verdict, raw = j.review(task, gold, answer, others)
-        round2.append({"judge_model": j.model, "raw": raw, **verdict})
+    result = {"round1": round1, **aggregate_panel(per_judge)}
 
-    return {"round1": round1, "round2": round2, **aggregate(round1, round2)}
+    if cross_review:
+        round2 = []
+        for j in judges:
+            others = _others_blurb(per_judge, exclude=j.model)
+            verdict, raw = j.review(task, gold, answer, others)
+            round2.append({"judge_model": j.model, "raw": raw, **verdict})
+        result["round2"] = round2
+        result.update(aggregate_review(round2, result))
+    return result
 
 
 def _load_records(results_root: str) -> list:
@@ -153,9 +192,11 @@ def _read(results_root: str, ref: str) -> str:
 
 def run_judge_pass(results_root: str, judge_models: list, base_url: str, api_key: str = "EMPTY",
                    golds: dict | None = None, samples_per_judge: int = 2,
-                   temperature: float = 0.3, only_conditions=None) -> str:
-    """Score every stored run with the cross-review ensemble. `golds` maps task_id -> reference
-    answer. Writes one file per run into results/judge/ with all judge I/O. Returns that dir."""
+                   temperature: float = 0.3, cross_review: bool = True,
+                   only_conditions=None) -> str:
+    """Score every stored run. The primary label is the independent panel; `cross_review` adds
+    the secondary peer-critique layer. `golds` maps task_id -> reference answer. Writes one file
+    per run into results/judge/ with all judge I/O. Returns that dir."""
     judges = [JudgeModel(m, base_url, api_key, temperature=temperature) for m in judge_models]
     judge_dir = os.path.join(results_root, "judge")
     os.makedirs(judge_dir, exist_ok=True)
@@ -166,7 +207,8 @@ def run_judge_pass(results_root: str, judge_models: list, base_url: str, api_key
             continue
         answer = _read(results_root, rec.get("output_ref", ""))
         gold = golds.get(rec["task_id"], rec.get("task_id", ""))
-        result = judge_one(judges, rec["task_id"], gold, answer, samples_per_judge)
+        result = judge_one(judges, rec["task_id"], gold, answer, samples_per_judge,
+                           cross_review=cross_review)
         out = {"run_id": rec["run_id"], "task_id": rec["task_id"],
                "condition": rec["condition"], "model": rec["model"], "trial": rec.get("trial"),
                "judge_models": judge_models, "samples_per_judge": samples_per_judge,

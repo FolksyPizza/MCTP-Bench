@@ -10,6 +10,8 @@ results/raw/
 results/outputs/
 results/judge/
 
-# External datasets fetched to the host (the small bundled sample IS committed).
+# External datasets fetched to the host (the small bundled samples ARE committed).
 data/HumanEval.jsonl
+data/mbpp.jsonl
+data/gsm8k.jsonl
 data/*.jsonl.gz
