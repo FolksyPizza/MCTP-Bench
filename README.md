@@ -50,6 +50,7 @@ conditions/      # builders: transcript, summary (same-model), rag (TF-IDF), mct
 scoring/         # objective scorers (unit tests / exact match) + the ensemble judge
 run.py           # in-house scenario CLI
 run_benchmark.py # large-scale matrix runner (suite x models x conditions x trials)
+bench_plan.py    # the run plan: suites, model waves, trials, total run count
 analyze.py       # pricing + committed aggregate tables
 scripts/         # host setup and dataset fetch (run on the GPU host)
 results/         # the storage tree (see docs/DATA-MODEL.md)

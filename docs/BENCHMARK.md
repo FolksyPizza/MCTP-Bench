@@ -201,10 +201,27 @@ python analyze.py    # pricing + aggregate tables
 Host preparation is scripted in `scripts/setup_host.sh` (clone + venv + vLLM, no model load) and
 `scripts/fetch_datasets.sh` (external datasets into `data/`).
 
-Phasing: (0) low-context OSS (HumanEval, MBPP) end to end with all four conditions, judge
-scoring, and cost accounting, served by vLLM; (1) multi-trial, more models, and context buckets —
-the first real dataset; (2) the extractor, then SWE-bench and long-context suites; (3) the
-learned reranker trained on the accumulated episodes, then multi-agent swarms.
+## Run plan
+
+The full matrix — suites, model waves, trials, and the total run count — is encoded in
+`bench_plan.py` (`python bench_plan.py` prints it; `--emit small|large` prints the per-wave
+commands). Two properties of the plan:
+
+- Two waves. The whole program runs first on a wave of small models (8–14B), then again on a wave
+  of large models (27–35B). The small wave is cheaper, shakes out the pipeline at scale, and is a
+  useful result in its own right; the large wave is the strongest-model evidence.
+- Reasoning on every scenario. Each wave includes a reasoning ("thinking") model, so reasoning is
+  exercised across all suites and conditions, not a subset. Runs use a raised generation budget so
+  reasoners finish; their output tokens (and cost) are recorded per run.
+
+Scoring is deferred to the cross-review ensemble pass (`scoring/judge.py`) after all receiver runs
+complete — see [DATA-MODEL.md](DATA-MODEL.md).
+
+Phasing (by suite readiness): (0) low-context OSS (HumanEval, then MBPP/GSM8K) end to end with
+objective scoring and cost accounting; (1) the in-house controls and a medium multi-file set with
+all four conditions — the first four-way dataset; (2) the extractor, then SWE-bench, RepoBench,
+and long-context suites; (3) the multi-agent swarm tier (smaller worker models) and the learned
+reranker (`mctp-learned`) trained on the accumulated runs.
 
 ## Compute budget (how to estimate it)
 

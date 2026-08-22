@@ -129,13 +129,26 @@ dependency) on the host, alongside the model server.
 Where a suite has an objective scorer (unit tests, exact match), it runs when the record is
 written and sets `objective_pass`. Open-ended tasks are left unscored for the judge pass.
 
-## Ensemble judge (a separate pass, after all runs)
+## Deferred cross-review judging (a separate pass, after all runs)
 
-After the runs complete, an ensemble of at least three judge models — chosen from different
-families to reduce self-preference bias — scores each output against the gold answer or a rubric.
-Each judge writes one record per run into `results/judge/`; the final score aggregates them
-(median or majority vote). The ensemble is validated against a human-labeled sample. This replaces
-keyword scoring, which a 27B model was already able to false-pass.
+All receiver runs are recorded first; scoring is a separate pass that never re-runs a receiver.
+The pass (`scoring/judge.py`) has three stages and stores every judge input/output, so the
+scoring itself is auditable and can be re-aggregated:
+
+1. Independent scoring — an ensemble of at least three judge models, chosen from different
+   families to reduce self-preference bias, each scores every output `samples_per_judge` times
+   (two by default) at nonzero temperature. The two samples expose a judge's own instability.
+2. Cross-review — each judge is then shown the other judges' assessments and asked to critique
+   them and give a final judgment, so an outlier can be corrected and disagreement is surfaced.
+3. Aggregation — the final label is the majority vote over the post-review pass/fail and the
+   median of the post-review scores. Inter-judge disagreement, sample instability, and the
+   round-1→round-2 score shift are recorded alongside.
+
+Each run gets one file in `results/judge/` holding all round-1 samples, all cross-review
+verdicts (with raw judge text), and the aggregate. The ensemble is validated against a
+human-labeled sample. This replaces keyword scoring, which a 27B model was already able to
+false-pass. Suites with a programmatic scorer (unit tests, exact match) are judged only as a
+validation sample; open-ended outputs are judged in full.
 
 ## Cost and pricing (at analysis time)
 
