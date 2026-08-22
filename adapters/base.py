@@ -27,6 +27,19 @@ class Task:
     meta: dict = field(default_factory=dict)
 
 
+def source_from_repo(suite: str, task_id: str, task_text: str, repo: dict, tier: str = "large",
+                     extractor: str = "heuristic", **extractor_kw) -> Source:
+    """Build a Source for a repository task: run the extractor to get an MCTP graph (used by the
+    `mctp` condition) and keep the raw files as a transcript/doc corpus (used by the other
+    conditions). `repo` is {path -> content}."""
+    from extraction import get_extractor
+    store, tid = get_extractor(extractor, **extractor_kw).extract(repo, task_text, "task_main")
+    graph = store.materialize()
+    transcript = "\n\n".join(f"--- {p} ---\n{c}" for p, c in repo.items())
+    return Source(suite=suite, task_id=task_id, task=task_text, tier=tier,
+                  transcript=transcript, docs=dict(repo), graph=graph, graph_task_id=tid)
+
+
 class Adapter:
     """Base class. Subclasses set `name`, `tier`, and implement `tasks`."""
     name = "adapter"

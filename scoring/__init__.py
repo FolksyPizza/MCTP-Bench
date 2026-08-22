@@ -11,7 +11,9 @@ from .objective import (
     extract_code,
     gsm8k_scorer,
     humaneval_scorer,
+    line_match,
     mbpp_scorer,
 )
 
-__all__ = ["exact_match", "extract_code", "gsm8k_scorer", "humaneval_scorer", "mbpp_scorer"]
+__all__ = ["exact_match", "extract_code", "gsm8k_scorer", "humaneval_scorer", "line_match",
+           "mbpp_scorer"]

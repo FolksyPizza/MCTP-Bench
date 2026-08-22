@@ -37,7 +37,7 @@ class MockRunner:
 
     name = "mock"
 
-    def run(self, task: str, context: str, retrievable: dict) -> RunResult:
+    def run(self, task: str, context: str, retrievable: dict, question=None) -> RunResult:
         retrieved = []
         only_references = "RETRIEVE " in context and "class " not in context
         if only_references and retrievable:
@@ -117,10 +117,10 @@ class OpenAICompatRunner:
                 return str(msg[key]).strip()
         return ""
 
-    def run(self, task: str, context: str, retrievable: dict) -> RunResult:
+    def run(self, task: str, context: str, retrievable: dict, question=None) -> RunResult:
         system = ("You continue another agent's work. Use only the provided context; do not "
                   "invent files or facts.")
-        user = f"{self.question}\n\nTASK: {task}\n\n--- CONTEXT ---\n{context}"
+        user = f"{question or self.question}\n\nTASK: {task}\n\n--- CONTEXT ---\n{context}"
         messages = [{"role": "system", "content": system},
                     {"role": "user", "content": user}]
         answer = self._chat(messages)

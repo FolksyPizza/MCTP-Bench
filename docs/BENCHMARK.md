@@ -84,8 +84,10 @@ shared MCTP state.
 - Failure modes: repeated context transfer; coordination loss between stages.
 - Why MCTP should help: shared state persists across agents, so downstream agents read from
   it rather than receiving a fresh transcript.
-- Status: specified; not yet implemented. Requires an episode model spanning multiple
-  handoffs.
+- Status: implemented via the multi-handoff pipeline (`mctpbench/pipeline.py`) and the `swarm`
+  adapter. Each stage is recorded as its own run, threading the accumulating state through every
+  condition, so the per-stage context cost of carrying state forward is captured directly (under
+  `transcript` it grows with the whole history; under `mctp` it stays a selected packet).
 
 ## Implemented scenarios
 
@@ -166,9 +168,12 @@ results/          the storage tree (see DATA-MODEL.md)
 - Adapter contract (`adapters/base.py`): an adapter yields per task an id, the `Source` (the task
   plus its transferable prior context — a transcript, a doc corpus, or a prebuilt MCTP graph), the
   receiver instruction, an objective scorer where the suite has one, and a gold answer or rubric
-  for the judge pass. `humaneval` and `mbpp` (unit-test scorers), `gsm8k` (exact-match), and
-  `inhouse` (the ten controls) are implemented; SWE-bench and long-context suites follow once the
-  extractor is applied to their repositories.
+  for the judge pass. Implemented: `humaneval` and `mbpp` (unit-test scorers), `gsm8k`
+  (final-number match), `swebench` (issue→patch on a repo; objective scoring deferred to the
+  SWE-bench harness), `repobench` (cross-file next-line completion; line-match scorer),
+  `longbench` (long-document QA; any-answer match or judge), `inhouse` (the ten controls), and
+  `swarm` (multi-agent pipelines). The repository suites build their `mctp` state through the
+  extractor (`adapters/base.source_from_repo`).
 - Extraction (`extraction/`): turning a real repository into an MCTP graph — the system's ceiling,
   since a linking miss here (not the selector) is what fails MCTP. `HeuristicExtractor` is the
   deterministic floor (files -> artifact nodes with parsed symbols and import-derived `depends_on`

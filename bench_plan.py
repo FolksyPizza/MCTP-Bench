@@ -50,10 +50,10 @@ SUITES = [
     Suite("gsm8k", "low", 500, LOW, phase=0, ready=True, objective=True),
     Suite("inhouse", "medium", 10, FOUR, phase=1, ready=True, objective=False),
     Suite("medium_multifile", "medium", 300, FOUR, phase=1, ready=False, objective=False),
-    Suite("swebench", "high", 500, FOUR, phase=2, ready=False, objective=True),
-    Suite("repobench", "high", 300, FOUR, phase=2, ready=False, objective=True),
-    Suite("longbench", "high", 400, FOUR, phase=2, ready=False, objective=False),
-    Suite("swarm", "subagent", 30, FOUR, phase=3, ready=False, agents_per_task=3,
+    Suite("swebench", "high", 500, FOUR, phase=2, ready=True, objective=True),
+    Suite("repobench", "high", 300, FOUR, phase=2, ready=True, objective=True),
+    Suite("longbench", "high", 400, FOUR, phase=2, ready=True, objective=False),
+    Suite("swarm", "subagent", 30, FOUR, phase=3, ready=True, agents_per_task=3,
           objective=False),
 ]
 

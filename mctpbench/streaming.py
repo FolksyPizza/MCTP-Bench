@@ -181,10 +181,10 @@ class StreamingRunner:
         prep = int(u.get("prompt_tokens", 0) or 0) + int(u.get("completion_tokens", 0) or 0)
         return summary, prep
 
-    def run(self, task: str, context: str, retrievable: dict) -> StreamResult:
+    def run(self, task: str, context: str, retrievable: dict, question=None) -> StreamResult:
         system = ("You continue another agent's work. Use only the provided context; do not "
                   "invent files or facts.")
-        user = f"{self.question}\n\nTASK: {task}\n\n--- CONTEXT ---\n{context}"
+        user = f"{question or self.question}\n\nTASK: {task}\n\n--- CONTEXT ---\n{context}"
         messages = [{"role": "system", "content": system},
                     {"role": "user", "content": user}]
 

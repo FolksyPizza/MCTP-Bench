@@ -41,13 +41,14 @@ mctpbench/
   runner.py       # AgentRunner interface: MockRunner + OpenAICompatRunner
   streaming.py    # StreamingRunner: raw capture + per-token timeline + native usage
   records.py      # RunRecord schema and ResultStore (the storage tree)
+  pipeline.py     # multi-handoff runner for the swarm tier (state threaded across stages)
   harness.py      # run_episode(...) and record_real(...) for model-in-the-loop runs
   scoring.py      # aggregate report grouped by (scenario, condition, runner)
   tokenizers.py   # token counting: heuristic, tiktoken encodings, optional Hugging Face
 scenarios/       # ten scenarios; see docs/SCENARIOS.md for what each does
-adapters/        # suite adapters: humaneval, mbpp, gsm8k (objective scorers), inhouse (controls)
+adapters/        # suites: humaneval, mbpp, gsm8k, swebench, repobench, longbench, inhouse, swarm
 conditions/      # builders: transcript, summary (same-model), rag (TF-IDF), mctp (Core packet)
-scoring/         # objective scorers (unit tests / exact match) + cross-review ensemble judge
+scoring/         # objective scorers (unit tests / exact match / line match) + cross-review judge
 extraction/      # repo -> MCTP graph: heuristic.py (deterministic floor), llm.py (the ceiling)
 run.py           # in-house scenario CLI
 run_benchmark.py # large-scale matrix runner (suite x models x conditions x trials)

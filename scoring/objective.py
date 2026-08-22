@@ -105,6 +105,27 @@ def gsm8k_scorer(problem: dict):
     return score
 
 
+def _first_code_line(answer: str) -> str:
+    """The first non-empty line of the model's code (for next-line completion suites)."""
+    code = extract_code(answer)
+    for line in code.splitlines():
+        if line.strip():
+            return line.strip()
+    return ""
+
+
+def line_match(gold_line: str):
+    """Scorer for next-line code completion: normalized equality of the predicted line to the
+    gold line. Whitespace-insensitive; a strict exact-match variant can replace it if needed."""
+    g = re.sub(r"\s+", " ", gold_line.strip())
+
+    def score(answer: str) -> tuple:
+        pred = re.sub(r"\s+", " ", _first_code_line(answer))
+        return pred == g, {"gold": gold_line, "pred": pred}
+
+    return score
+
+
 def _normalize(s: str) -> str:
     return re.sub(r"\s+", " ", s.strip().lower())
 

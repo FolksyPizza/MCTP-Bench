@@ -26,10 +26,23 @@ def get_adapter(name: str) -> Adapter:
     if name == "gsm8k":
         from .gsm8k import GSM8KAdapter
         return GSM8KAdapter()
+    if name == "swebench":
+        from .swebench import SWEBenchAdapter
+        return SWEBenchAdapter()
+    if name == "repobench":
+        from .repobench import RepoBenchAdapter
+        return RepoBenchAdapter()
+    if name == "longbench":
+        from .longbench import LongBenchAdapter
+        return LongBenchAdapter()
     if name == "inhouse":
         from .inhouse import InHouseAdapter
         return InHouseAdapter()
-    raise ValueError(f"unknown suite: {name} (have: humaneval, mbpp, gsm8k, inhouse)")
+    if name == "swarm":
+        from .swarm import SwarmAdapter
+        return SwarmAdapter()
+    raise ValueError(f"unknown suite: {name} (have: humaneval, mbpp, gsm8k, swebench, "
+                     f"repobench, longbench, inhouse, swarm)")
 
 
 __all__ = ["Adapter", "Task", "get_adapter"]

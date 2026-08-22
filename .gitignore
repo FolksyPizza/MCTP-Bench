@@ -14,4 +14,7 @@ results/judge/
 data/HumanEval.jsonl
 data/mbpp.jsonl
 data/gsm8k.jsonl
+data/swebench.jsonl
+data/repobench.jsonl
+data/longbench.jsonl
 data/*.jsonl.gz

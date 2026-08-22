@@ -49,11 +49,14 @@ def _tok(text: str, t: str) -> int:
         return 0
 
 
-def run_one(store, adapter, task, condition, model, trial, runner, tok, *,
-            summarizer=None, endpoint="", temperature=0.0, seed=1, max_tokens=None) -> RunRecord:
-    built = build(task.source, condition, summarizer=summarizer)
-    result = runner.run(task=task.source.task, context=built.text,
-                        retrievable=built.retrievable)
+def execute_run(store, *, suite, task_id, tier, source, condition, model, trial, runner, tok,
+                instruction=None, objective=None, summarizer=None, endpoint="", temperature=0.0,
+                seed=1, max_tokens=None):
+    """Build one condition's context, run the receiver, score, and record. Returns
+    (RunRecord, answer_text). Reused by the matrix runner and the multi-handoff pipeline."""
+    built = build(source, condition, summarizer=summarizer)
+    result = runner.run(task=source.task, context=built.text, retrievable=built.retrievable,
+                        question=instruction)
 
     answer = result.answer
     reasoning = getattr(result, "reasoning", "") or ""
@@ -65,9 +68,9 @@ def run_one(store, adapter, task, condition, model, trial, runner, tok, *,
     retrieved_tokens = sum(_tok(built.retrievable[i], tok) for i in retrieved)
 
     objective_pass, objective_detail = (None, {})
-    if task.objective is not None:
+    if objective is not None:
         try:
-            objective_pass, objective_detail = task.objective(answer)
+            objective_pass, objective_detail = objective(answer)
         except Exception as e:  # a scorer crash must not lose the run
             objective_detail = {"scorer_error": f"{type(e).__name__}: {e}"}
 
@@ -77,7 +80,7 @@ def run_one(store, adapter, task, condition, model, trial, runner, tok, *,
         ttft = next((r.ttft_s for r in result.rounds if r.ttft_s is not None), None)
 
     rec = RunRecord(
-        run_id=new_run_id(), suite=adapter.name, task_id=task.task_id, tier=task.source.tier,
+        run_id=new_run_id(), suite=suite, task_id=task_id, tier=tier,
         condition=condition, model=model, model_size_b=_size_b(model),
         reasoning=_is_reasoning(model), trial=trial,
         started_at=_iso(getattr(result, "started_at", 0.0)),
@@ -93,8 +96,20 @@ def run_one(store, adapter, task, condition, model, trial, runner, tok, *,
         runner=getattr(runner, "name", "unknown"), endpoint=endpoint,
         temperature=temperature, seed=seed, max_tokens=max_tokens,
     )
-    return store.write_run(rec, prompt=prompt_text, output=answer, reasoning=reasoning,
-                           timeline=timeline, raw_result=result)
+    rec = store.write_run(rec, prompt=prompt_text, output=answer, reasoning=reasoning,
+                          timeline=timeline, raw_result=result)
+    return rec, answer
+
+
+def run_one(store, adapter, task, condition, model, trial, runner, tok, *,
+            summarizer=None, endpoint="", temperature=0.0, seed=1, max_tokens=None) -> RunRecord:
+    rec, _ = execute_run(
+        store, suite=adapter.name, task_id=task.task_id, tier=task.source.tier,
+        source=task.source, condition=condition, model=model, trial=trial, runner=runner,
+        tok=tok, instruction=task.receiver_instruction, objective=task.objective,
+        summarizer=summarizer, endpoint=endpoint, temperature=temperature, seed=seed,
+        max_tokens=max_tokens)
+    return rec
 
 
 def _iso(epoch: float) -> str:
@@ -106,7 +121,9 @@ def _iso(epoch: float) -> str:
 
 def main():
     ap = argparse.ArgumentParser(description="MCTP-Bench matrix runner")
-    ap.add_argument("--suite", required=True, help="humaneval | inhouse")
+    ap.add_argument("--suite", required=True,
+                    help="humaneval | mbpp | gsm8k | swebench | repobench | longbench | "
+                         "inhouse | swarm")
     ap.add_argument("--models", default="", help="comma-separated model ids")
     ap.add_argument("--conditions", default="", help="comma-separated; default: suite's set")
     ap.add_argument("--trials", type=int, default=1)
@@ -162,20 +179,34 @@ def main():
                 summ = summarizer if condition == "summary" else None
                 for trial in range(1, args.trials + 1):
                     n += 1
+                    endpoint = "" if args.dry_run else args.url
                     try:
-                        rec = run_one(store, adapter, task, condition, model, trial, runner,
-                                      tok, summarizer=summ,
-                                      endpoint="" if args.dry_run else args.url,
-                                      temperature=args.temperature, seed=args.seed,
-                                      max_tokens=args.max_tokens)
-                        passed = ("-" if rec.objective_pass is None
-                                  else "pass" if rec.objective_pass else "FAIL")
-                        print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} {model:18.18} "
-                              f"t{trial} {passed:4} ctx={rec.context_tokens} "
-                              f"out_tok={rec.output_tokens} lat={rec.latency_s:.1f}s")
+                        if args.suite == "swarm":
+                            from mctpbench.pipeline import run_pipeline
+                            recs = run_pipeline(
+                                store, task, condition, model, trial, runner, tok,
+                                summarizer=summ, endpoint=endpoint,
+                                temperature=args.temperature, seed=args.seed,
+                                max_tokens=args.max_tokens)
+                            ctx = [r.context_tokens for r in recs]
+                            obj = [("-" if r.objective_pass is None else
+                                    "pass" if r.objective_pass else "FAIL") for r in recs]
+                            print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} "
+                                  f"{model:18.18} t{trial} stages={len(recs)} obj={obj} "
+                                  f"ctx_per_stage={ctx}")
+                        else:
+                            rec = run_one(store, adapter, task, condition, model, trial, runner,
+                                          tok, summarizer=summ, endpoint=endpoint,
+                                          temperature=args.temperature, seed=args.seed,
+                                          max_tokens=args.max_tokens)
+                            passed = ("-" if rec.objective_pass is None
+                                      else "pass" if rec.objective_pass else "FAIL")
+                            print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} "
+                                  f"{model:18.18} t{trial} {passed:4} ctx={rec.context_tokens} "
+                                  f"out_tok={rec.output_tokens} lat={rec.latency_s:.1f}s")
                     except Exception as e:
-                        print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} {model:18.18} "
-                              f"t{trial} ERROR {type(e).__name__}: {e}")
+                        print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} "
+                              f"{model:18.18} t{trial} ERROR {type(e).__name__}: {e}")
 
     print(f"\n{n} runs -> {os.path.relpath(args.results)}/  "
           f"(runs/ raw/ outputs/ gitignored; aggregates/ configs/ committed)")
