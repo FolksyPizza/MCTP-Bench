@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime
 import os
+import signal
 import time
 
 
@@ -99,6 +100,60 @@ class Progress:
         return (f"progress {self.done}/{self.total} ({pct:.1f}%), {self.remaining()} left, "
                 f"{self.rate():.1f}s/run, elapsed {fmt_duration(elapsed)}, "
                 f"ETA {fmt_duration(self.eta_seconds())}")
+
+
+class StopController:
+    """Graceful stop: finish the current run, save, then stop — rather than aborting mid-run.
+
+    A stop is requested two ways: a SIGINT (Ctrl-C) or SIGTERM, or the appearance of `stop_file`
+    (so another terminal can pause a running sweep with `touch <stop_file>`). The run loop checks
+    `should_stop()` at each boundary and breaks cleanly; every finished run is already recorded, so
+    nothing is lost and `--resume` continues. A second Ctrl-C aborts immediately."""
+
+    def __init__(self, stop_file: str | None = None):
+        self.stop_file = stop_file
+        self._stop = False
+        self._orig = {}
+
+    def _handler(self, signum, frame):
+        if self._stop:                      # second signal -> hard abort
+            raise KeyboardInterrupt
+        self._stop = True
+        print("\n[stop] requested — finishing the current run, then saving and stopping "
+              "(Ctrl-C again to abort now)...", flush=True)
+
+    def install(self) -> "StopController":
+        for s in (signal.SIGINT, signal.SIGTERM):
+            try:
+                self._orig[s] = signal.signal(s, self._handler)
+            except (ValueError, OSError):   # e.g. not on the main thread
+                pass
+        return self
+
+    def restore(self) -> None:
+        for s, h in self._orig.items():
+            try:
+                signal.signal(s, h)
+            except (ValueError, OSError):
+                pass
+
+    def should_stop(self) -> bool:
+        if self._stop:
+            return True
+        if self.stop_file and os.path.exists(self.stop_file):
+            self._stop = True
+            print(f"\n[stop] stop-file seen ({os.path.basename(self.stop_file)}) — "
+                  "saving and stopping after the current run.", flush=True)
+            return True
+        return False
+
+    def clear_stop_file(self) -> None:
+        """Remove the stop-file once honored, so a later --resume run is not stopped immediately."""
+        if self.stop_file and os.path.exists(self.stop_file):
+            try:
+                os.remove(self.stop_file)
+            except OSError:
+                pass
 
 
 def _parse_time(s: str) -> datetime.time:

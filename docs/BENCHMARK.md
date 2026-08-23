@@ -217,9 +217,13 @@ including the SWE-bench per-instance file snapshots by repo checkout).
 Operating a long sweep (`run_benchmark.py`):
 
 - `--resume` skips runs already in the checkpoint manifest (`results/progress/<suite>.log`). Every
-  run is recorded the moment it finishes, so an interrupt (Ctrl-C), a crash, or `--max-hours`
-  loses at most the in-flight run; re-running with `--resume` continues. This also covers the
-  swarm tier, whose per-stage records don't map to one key.
+  run is recorded the moment it finishes, so an interrupt, a crash, or `--max-hours` loses at most
+  the in-flight run; re-running with `--resume` continues. This also covers the swarm tier, whose
+  per-stage records don't map to one key.
+- Graceful pause/stop: Ctrl-C (or SIGTERM) finishes the current run, saves, and stops — it does
+  not abort mid-run (a second Ctrl-C aborts immediately). From another terminal, `touch
+  results/progress/<suite>.stop` requests the same clean stop without signalling the process; the
+  stop-file is removed once honored, so the next `--resume` proceeds.
 - `--window 23:00-06:00` confines work to a clock window (local time, wraps midnight): outside it
   the runner sleeps until the window opens. `--max-hours N` stops cleanly after a time budget.
 - Progress is reported as `done/total`, remaining, a rolling seconds-per-run rate, elapsed, and an

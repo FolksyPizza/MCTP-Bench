@@ -27,7 +27,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 from adapters import get_adapter  # noqa: E402
 from conditions import build  # noqa: E402
 from mctpbench import tokenizers  # noqa: E402
-from mctpbench.orchestrate import Manifest, Progress, WindowGate, run_key  # noqa: E402
+from mctpbench.orchestrate import (  # noqa: E402
+    Manifest, Progress, StopController, WindowGate, run_key)
 from mctpbench.records import ResultStore, RunRecord, new_run_id  # noqa: E402
 from mctpbench.runner import MockRunner  # noqa: E402
 from mctpbench.streaming import StreamingRunner  # noqa: E402
@@ -190,6 +191,11 @@ def main():
     if already:
         print(f"resume: {already}/{total} already recorded — skipping those\n")
 
+    stop_file = os.path.join(args.results, "progress", f"{args.suite}.stop")
+    stopper = StopController(stop_file).install()
+    print(f"controls: resume={args.resume}  window={args.window or 'always'}  "
+          f"pause/stop: Ctrl-C or `touch {os.path.relpath(stop_file)}`\n")
+
     n = 0
     stop_at = (time.monotonic() + args.max_hours * 3600) if args.max_hours else None
     stopped = False
@@ -200,6 +206,9 @@ def main():
             key = run_key(args.suite, task.task_id, condition, model, trial)
             if args.resume and manifest.has(key):
                 continue
+            if stopper.should_stop():
+                stopped = True
+                break
             if stop_at and time.monotonic() >= stop_at:
                 print(f"\n[max-hours] reached {args.max_hours}h budget; stopping cleanly. "
                       f"Re-run with --resume to continue.")
@@ -241,11 +250,15 @@ def main():
                 print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} {model:18.18} "
                       f"t{trial} ERROR {type(e).__name__}: {e}")
     except KeyboardInterrupt:
-        print("\n[interrupted] checkpoint saved; re-run with --resume to continue.")
+        print("\n[aborted] checkpoint saved; re-run with --resume to continue.")
         stopped = True
     finally:
         manifest.close()
+        stopper.clear_stop_file()
+        stopper.restore()
 
+    if stopped:
+        print("\n[stopped] checkpoint saved. Continue later with the same command plus --resume.")
     print(f"\n{progress.done}/{total} runs recorded"
           f"{' (stopped early)' if stopped else ''} -> {os.path.relpath(args.results)}/  "
           f"(runs/ raw/ outputs/ gitignored; aggregates/ configs/ committed)")
