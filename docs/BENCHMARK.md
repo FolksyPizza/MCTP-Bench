@@ -211,7 +211,25 @@ python analyze.py    # pricing + aggregate tables
 ```
 
 Host preparation is scripted in `scripts/setup_host.sh` (clone + venv + vLLM, no model load) and
-`scripts/fetch_datasets.sh` (external datasets into `data/`).
+`scripts/fetch_datasets.sh` (external datasets into `data/`, via `scripts/prepare_datasets.py`;
+including the SWE-bench per-instance file snapshots by repo checkout).
+
+Operating a long sweep (`run_benchmark.py`):
+
+- `--resume` skips runs already in the checkpoint manifest (`results/progress/<suite>.log`). Every
+  run is recorded the moment it finishes, so an interrupt (Ctrl-C), a crash, or `--max-hours`
+  loses at most the in-flight run; re-running with `--resume` continues. This also covers the
+  swarm tier, whose per-stage records don't map to one key.
+- `--window 23:00-06:00` confines work to a clock window (local time, wraps midnight): outside it
+  the runner sleeps until the window opens. `--max-hours N` stops cleanly after a time budget.
+- Progress is reported as `done/total`, remaining, a rolling seconds-per-run rate, elapsed, and an
+  ETA, every `--progress-every` runs (default 25).
+
+Tokenizers: reference token counts are computed under the set from `tokenizers.reference_set()` —
+the tiktoken encodings plus, when `transformers` is present, open-model tokenizers (Qwen, Llama by
+default). Configure with `MCTP_HF_TOKENIZERS` (add open-model ids) or `MCTP_REF_TOKENIZERS` (an
+explicit list). The model's own native counts still come from the server `usage`; these reference
+counts make amounts comparable across families that tokenize differently.
 
 ## Run plan
 

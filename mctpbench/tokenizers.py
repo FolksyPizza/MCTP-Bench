@@ -15,9 +15,14 @@ tiktoken is installed into the repository virtualenv (`.venv`); run the harness 
 from __future__ import annotations
 
 import functools
+import os
 
 HEURISTIC = "heuristic"
 _TIKTOKEN_ENCODINGS = ("gpt2", "cl100k_base", "o200k_base")
+# Open-model tokenizers to include as reference counts, when transformers + the tokenizer files
+# are available. Override with MCTP_HF_TOKENIZERS (comma-separated model ids). These make token
+# amounts comparable under the families actually being run (Qwen, Llama, ...), not only OpenAI's.
+_DEFAULT_HF = ("Qwen/Qwen2.5-7B", "meta-llama/Llama-3.1-8B")
 
 
 def _heuristic(text: str) -> int:
@@ -36,6 +41,19 @@ def _hf(model: str):
     return AutoTokenizer.from_pretrained(model)
 
 
+def _configured_hf() -> list:
+    """`hf:<model>` names from MCTP_HF_TOKENIZERS, or the defaults, if transformers is importable.
+    Names are listed optimistically; a model whose files are absent fails lazily at count time and
+    is skipped there (see records.ref_token_counts)."""
+    try:
+        import transformers  # noqa: F401
+    except Exception:
+        return []
+    env = os.environ.get("MCTP_HF_TOKENIZERS")
+    models = [m.strip() for m in env.split(",")] if env else list(_DEFAULT_HF)
+    return [f"hf:{m}" for m in models if m]
+
+
 def available() -> list:
     """Names of tokenizers usable in this environment, heuristic first."""
     names = [HEURISTIC]
@@ -44,7 +62,26 @@ def available() -> list:
         names += [f"tiktoken:{e}" for e in _TIKTOKEN_ENCODINGS]
     except Exception:
         pass
+    names += _configured_hf()
     return names
+
+
+def reference_set() -> list:
+    """Tokenizers used for per-run reference counts. Configurable with MCTP_REF_TOKENIZERS (an
+    explicit comma-separated list, overriding everything) or MCTP_HF_TOKENIZERS (open-model
+    tokenizers added to the tiktoken encodings). Falls back to the heuristic if nothing else is
+    available."""
+    env = os.environ.get("MCTP_REF_TOKENIZERS")
+    if env:
+        return [t.strip() for t in env.split(",") if t.strip()]
+    out = []
+    try:
+        import tiktoken  # noqa: F401
+        out += [f"tiktoken:{e}" for e in _TIKTOKEN_ENCODINGS]
+    except Exception:
+        pass
+    out += _configured_hf()
+    return out or [HEURISTIC]
 
 
 def default() -> str:

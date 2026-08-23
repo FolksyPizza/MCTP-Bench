@@ -9,6 +9,7 @@ results/runs/
 results/raw/
 results/outputs/
 results/judge/
+results/progress/
 
 # External datasets fetched to the host (the small bundled samples ARE committed).
 data/HumanEval.jsonl
@@ -19,3 +20,4 @@ data/repobench.jsonl
 data/longbench.jsonl
 data/multifile.jsonl
 data/*.jsonl.gz
+data/_repo_cache/

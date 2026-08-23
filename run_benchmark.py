@@ -20,12 +20,14 @@ import argparse
 import os
 import re
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(__file__))
 
 from adapters import get_adapter  # noqa: E402
 from conditions import build  # noqa: E402
 from mctpbench import tokenizers  # noqa: E402
+from mctpbench.orchestrate import Manifest, Progress, WindowGate, run_key  # noqa: E402
 from mctpbench.records import ResultStore, RunRecord, new_run_id  # noqa: E402
 from mctpbench.runner import MockRunner  # noqa: E402
 from mctpbench.streaming import StreamingRunner  # noqa: E402
@@ -137,6 +139,14 @@ def main():
     ap.add_argument("--tokenizer", default=None)
     ap.add_argument("--dry-run", action="store_true",
                     help="deterministic MockRunner, no server contact")
+    ap.add_argument("--resume", action="store_true",
+                    help="skip runs already recorded in the checkpoint manifest")
+    ap.add_argument("--window", default=None,
+                    help="only run within a clock window, e.g. 23:00-06:00 (local time)")
+    ap.add_argument("--max-hours", type=float, default=None,
+                    help="stop cleanly after this many hours; --resume continues later")
+    ap.add_argument("--progress-every", type=int, default=25,
+                    help="print an ETA/progress line every N runs")
     args = ap.parse_args()
 
     adapter = get_adapter(args.suite)
@@ -170,45 +180,74 @@ def main():
         "temperature": args.temperature, "seed": args.seed, "max_tokens": args.max_tokens,
     })
 
-    n = 0
-    for model in models:
-        runner = make_runner(model)
-        summarizer = summarizer_for(runner)
-        for task in tasks:
-            for condition in conditions:
-                summ = summarizer if condition == "summary" else None
-                for trial in range(1, args.trials + 1):
-                    n += 1
-                    endpoint = "" if args.dry_run else args.url
-                    try:
-                        if args.suite == "swarm":
-                            from mctpbench.pipeline import run_pipeline
-                            recs = run_pipeline(
-                                store, task, condition, model, trial, runner, tok,
-                                summarizer=summ, endpoint=endpoint,
-                                temperature=args.temperature, seed=args.seed,
-                                max_tokens=args.max_tokens)
-                            ctx = [r.context_tokens for r in recs]
-                            obj = [("-" if r.objective_pass is None else
-                                    "pass" if r.objective_pass else "FAIL") for r in recs]
-                            print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} "
-                                  f"{model:18.18} t{trial} stages={len(recs)} obj={obj} "
-                                  f"ctx_per_stage={ctx}")
-                        else:
-                            rec = run_one(store, adapter, task, condition, model, trial, runner,
-                                          tok, summarizer=summ, endpoint=endpoint,
-                                          temperature=args.temperature, seed=args.seed,
-                                          max_tokens=args.max_tokens)
-                            passed = ("-" if rec.objective_pass is None
-                                      else "pass" if rec.objective_pass else "FAIL")
-                            print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} "
-                                  f"{model:18.18} t{trial} {passed:4} ctx={rec.context_tokens} "
-                                  f"out_tok={rec.output_tokens} lat={rec.latency_s:.1f}s")
-                    except Exception as e:
-                        print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} "
-                              f"{model:18.18} t{trial} ERROR {type(e).__name__}: {e}")
+    manifest = Manifest(os.path.join(args.results, "progress", f"{args.suite}.log"))
+    gate = WindowGate(args.window)
+    jobs = [(m, task, c, tr) for m in models for task in tasks for c in conditions
+            for tr in range(1, args.trials + 1)]
+    already = sum(1 for m, task, c, tr in jobs
+                  if args.resume and manifest.has(run_key(args.suite, task.task_id, c, m, tr)))
+    progress = Progress(total=total, done=already)
+    if already:
+        print(f"resume: {already}/{total} already recorded — skipping those\n")
 
-    print(f"\n{n} runs -> {os.path.relpath(args.results)}/  "
+    n = 0
+    stop_at = (time.monotonic() + args.max_hours * 3600) if args.max_hours else None
+    stopped = False
+    runners = {}
+    try:
+        for model, task, condition, trial in jobs:
+            n += 1
+            key = run_key(args.suite, task.task_id, condition, model, trial)
+            if args.resume and manifest.has(key):
+                continue
+            if stop_at and time.monotonic() >= stop_at:
+                print(f"\n[max-hours] reached {args.max_hours}h budget; stopping cleanly. "
+                      f"Re-run with --resume to continue.")
+                stopped = True
+                break
+            gate.wait_until_open()
+
+            runner = runners.get(model) or runners.setdefault(model, make_runner(model))
+            summ = summarizer_for(runner) if condition == "summary" else None
+            endpoint = "" if args.dry_run else args.url
+            t0 = time.monotonic()
+            try:
+                if args.suite == "swarm":
+                    from mctpbench.pipeline import run_pipeline
+                    recs = run_pipeline(store, task, condition, model, trial, runner, tok,
+                                        summarizer=summ, endpoint=endpoint,
+                                        temperature=args.temperature, seed=args.seed,
+                                        max_tokens=args.max_tokens)
+                    ctx = [r.context_tokens for r in recs]
+                    obj = [("-" if r.objective_pass is None else
+                            "pass" if r.objective_pass else "FAIL") for r in recs]
+                    print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} {model:18.18} "
+                          f"t{trial} stages={len(recs)} obj={obj} ctx_per_stage={ctx}")
+                else:
+                    rec = run_one(store, adapter, task, condition, model, trial, runner, tok,
+                                  summarizer=summ, endpoint=endpoint,
+                                  temperature=args.temperature, seed=args.seed,
+                                  max_tokens=args.max_tokens)
+                    passed = ("-" if rec.objective_pass is None
+                              else "pass" if rec.objective_pass else "FAIL")
+                    print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} {model:18.18} "
+                          f"t{trial} {passed:4} ctx={rec.context_tokens} "
+                          f"out_tok={rec.output_tokens} lat={rec.latency_s:.1f}s")
+                manifest.add(key)
+                progress.tick(time.monotonic() - t0)
+                if args.progress_every and progress.done % args.progress_every == 0:
+                    print(f"  -- {progress.line()}")
+            except Exception as e:
+                print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} {model:18.18} "
+                      f"t{trial} ERROR {type(e).__name__}: {e}")
+    except KeyboardInterrupt:
+        print("\n[interrupted] checkpoint saved; re-run with --resume to continue.")
+        stopped = True
+    finally:
+        manifest.close()
+
+    print(f"\n{progress.done}/{total} runs recorded"
+          f"{' (stopped early)' if stopped else ''} -> {os.path.relpath(args.results)}/  "
           f"(runs/ raw/ outputs/ gitignored; aggregates/ configs/ committed)")
 
 

@@ -28,9 +28,6 @@ from dataclasses import asdict, dataclass, field
 
 from . import tokenizers
 
-REF_TOKENIZERS = [t for t in tokenizers.available() if t != tokenizers.HEURISTIC] \
-    or [tokenizers.HEURISTIC]
-
 
 @dataclass
 class RunRecord:
@@ -103,10 +100,11 @@ def _git_commit(repo_dir: str) -> str:
 
 
 def ref_token_counts(prompt: str, output: str, reasoning: str) -> dict:
-    """Reference token counts over each text under the fixed reference tokenizer set, so
-    amounts are comparable across models that tokenize differently."""
+    """Reference token counts over each text under the configured reference tokenizer set (see
+    tokenizers.reference_set), so amounts are comparable across models that tokenize differently.
+    A tokenizer whose files are unavailable is skipped."""
     counts = {}
-    for t in REF_TOKENIZERS:
+    for t in tokenizers.reference_set():
         try:
             counts[t] = {
                 "prompt": tokenizers.count(prompt, t),
