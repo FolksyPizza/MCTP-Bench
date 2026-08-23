@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from adapters import get_adapter  # noqa: E402
 from conditions import build  # noqa: E402
-from mctpbench import tokenizers  # noqa: E402
+from mctpbench import telemetry, tokenizers  # noqa: E402
 from mctpbench.orchestrate import (  # noqa: E402
     Manifest, Progress, StopController, WindowGate, run_key)
 from mctpbench.records import ResultStore, RunRecord, new_run_id  # noqa: E402
@@ -115,6 +115,22 @@ def run_one(store, adapter, task, condition, model, trial, runner, tok, *,
     return rec
 
 
+def _parse_models(spec: str, default_url: str) -> list:
+    """Parse '--models' into [(model_id, endpoint_url)]. A model may carry its own endpoint as
+    'model@http://host:port/v1'; bare models use default_url."""
+    out = []
+    for m in spec.split(","):
+        m = m.strip()
+        if not m:
+            continue
+        if "@" in m:
+            name, url = m.split("@", 1)
+            out.append((name.strip(), url.strip()))
+        else:
+            out.append((m, default_url))
+    return out
+
+
 def _iso(epoch: float) -> str:
     if not epoch:
         return ""
@@ -148,6 +164,8 @@ def main():
                     help="stop cleanly after this many hours; --resume continues later")
     ap.add_argument("--progress-every", type=int, default=25,
                     help="print an ETA/progress line every N runs")
+    ap.add_argument("--telemetry-port", type=int, default=8765,
+                    help="serve live telemetry on 127.0.0.1:<port> for monitor.py (0 disables)")
     args = ap.parse_args()
 
     adapter = get_adapter(args.suite)
@@ -158,28 +176,36 @@ def main():
 
     if args.dry_run or not args.models:
         models = ["mock"]
+        url_of = {"mock": ""}
         make_runner = lambda _m: MockRunner()  # noqa: E731
         summarizer_for = lambda _r: None       # noqa: E731
         mode = "DRY RUN (MockRunner, no server)"
     else:
-        models = [m.strip() for m in args.models.split(",") if m.strip()]
+        # Each model may carry its own endpoint as `model@url`, so a sweep can fan out across
+        # several vLLM servers (each vLLM process serves one model). Bare models use --url.
+        specs = _parse_models(args.models, args.url)
+        models = [name for name, _ in specs]
+        url_of = dict(specs)
         make_runner = lambda m: StreamingRunner(  # noqa: E731
-            base_url=args.url, model=m, api_key=args.api_key, max_tokens=args.max_tokens,
+            base_url=url_of[m], model=m, api_key=args.api_key, max_tokens=args.max_tokens,
             temperature=args.temperature, seed=args.seed)
         summarizer_for = lambda r: r.summarize   # noqa: E731
-        mode = f"endpoint {args.url}"
+        mode = "  ".join(f"{n}@{u}" for n, u in specs)
 
     tasks = list(adapter.tasks(limit=args.limit))
     total = len(tasks) * len(models) * len(conditions) * args.trials
-    print(f"suite={args.suite}  {mode}  models={models}  conditions={conditions}  "
+    print(f"suite={args.suite}  {mode}  conditions={conditions}  "
           f"tasks={len(tasks)}  trials={args.trials}  -> {total} runs  tokenizer={tok}\n")
 
     store.write_config(f"{args.suite}_batch.json", {
-        "suite": args.suite, "models": models, "conditions": conditions,
+        "suite": args.suite, "models": models, "endpoints": url_of, "conditions": conditions,
         "trials": args.trials, "limit": args.limit, "tokenizer": tok,
-        "endpoint": None if (args.dry_run or not args.models) else args.url,
         "temperature": args.temperature, "seed": args.seed, "max_tokens": args.max_tokens,
     })
+
+    tele = telemetry.start(port=args.telemetry_port) if args.telemetry_port else telemetry._NullTelemetry()
+    tele.update(suite=args.suite, models=models, conditions=conditions, total=total,
+                done=0, running=True, tallies={"pass": 0, "fail": 0, "none": 0, "error": 0})
 
     manifest = Manifest(os.path.join(args.results, "progress", f"{args.suite}.log"))
     gate = WindowGate(args.window)
@@ -200,6 +226,7 @@ def main():
     stop_at = (time.monotonic() + args.max_hours * 3600) if args.max_hours else None
     stopped = False
     runners = {}
+    tallies = {"pass": 0, "fail": 0, "none": 0, "error": 0}
     try:
         for model, task, condition, trial in jobs:
             n += 1
@@ -218,7 +245,11 @@ def main():
 
             runner = runners.get(model) or runners.setdefault(model, make_runner(model))
             summ = summarizer_for(runner) if condition == "summary" else None
-            endpoint = "" if args.dry_run else args.url
+            endpoint = "" if args.dry_run else url_of[model]
+            tele.update(current={"model": model, "condition": condition, "task": task.task_id},
+                        done=progress.done, remaining=progress.remaining(),
+                        rate_s=round(progress.rate(), 2), eta_s=progress.eta_seconds(),
+                        elapsed_s=round(time.monotonic() - progress.start, 1))
             t0 = time.monotonic()
             try:
                 if args.suite == "swarm":
@@ -228,8 +259,11 @@ def main():
                                         temperature=args.temperature, seed=args.seed,
                                         max_tokens=args.max_tokens)
                     ctx = [r.context_tokens for r in recs]
-                    obj = [("-" if r.objective_pass is None else
-                            "pass" if r.objective_pass else "FAIL") for r in recs]
+                    objs = [r.objective_pass for r in recs]
+                    obj = [("-" if o is None else "pass" if o else "FAIL") for o in objs]
+                    outcome = ("fail" if any(o is False for o in objs)
+                               else "pass" if any(objs) else "none")
+                    last = f"{task.task_id} {condition} {model} stages={len(recs)} {outcome}"
                     print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} {model:18.18} "
                           f"t{trial} stages={len(recs)} obj={obj} ctx_per_stage={ctx}")
                 else:
@@ -237,16 +271,26 @@ def main():
                                   summarizer=summ, endpoint=endpoint,
                                   temperature=args.temperature, seed=args.seed,
                                   max_tokens=args.max_tokens)
-                    passed = ("-" if rec.objective_pass is None
-                              else "pass" if rec.objective_pass else "FAIL")
+                    outcome = ("none" if rec.objective_pass is None
+                               else "pass" if rec.objective_pass else "fail")
+                    last = (f"{task.task_id} {condition} {model} {outcome} "
+                            f"ctx={rec.context_tokens} out={rec.output_tokens}")
                     print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} {model:18.18} "
-                          f"t{trial} {passed:4} ctx={rec.context_tokens} "
+                          f"t{trial} {outcome:4} ctx={rec.context_tokens} "
                           f"out_tok={rec.output_tokens} lat={rec.latency_s:.1f}s")
                 manifest.add(key)
                 progress.tick(time.monotonic() - t0)
+                tallies[outcome] += 1
+                tele.update(done=progress.done, remaining=progress.remaining(),
+                            rate_s=round(progress.rate(), 2), eta_s=progress.eta_seconds(),
+                            elapsed_s=round(time.monotonic() - progress.start, 1),
+                            tallies=dict(tallies), last=last)
                 if args.progress_every and progress.done % args.progress_every == 0:
                     print(f"  -- {progress.line()}")
             except Exception as e:
+                tallies["error"] += 1
+                tele.update(tallies=dict(tallies),
+                            last=f"{task.task_id} {condition} {model} ERROR {type(e).__name__}")
                 print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} {model:18.18} "
                       f"t{trial} ERROR {type(e).__name__}: {e}")
     except KeyboardInterrupt:
@@ -256,6 +300,8 @@ def main():
         manifest.close()
         stopper.clear_stop_file()
         stopper.restore()
+        tele.update(running=False, stopped=stopped)
+        tele.stop()
 
     if stopped:
         print("\n[stopped] checkpoint saved. Continue later with the same command plus --resume.")

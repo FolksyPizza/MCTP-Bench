@@ -208,6 +208,26 @@ python -m vllm.entrypoints.openai.api_server --model <hf-model> --port 8000 \
 python run_benchmark.py --suite humaneval --models <model-id> \
     --conditions transcript,mctp --trials 3 --url http://localhost:8000/v1
 python analyze.py    # pricing + aggregate tables
+
+# a fast first run (one small model, low-context suites, a few tasks each):
+bash scripts/smoke.sh <model-id> http://localhost:8000/v1
+```
+
+Because each vLLM process serves one model, a sweep targets a model's own endpoint. `--url` is the
+default; a model may override it inline as `model@url`, so a run can fan out across several servers
+(for example a small model on each GPU):
+
+```
+python run_benchmark.py --suite mbpp \
+    --models 'qwen2.5-coder:14b@http://localhost:8000/v1,llama3.1:8b@http://localhost:8001/v1'
+```
+
+The runner serves live telemetry on `127.0.0.1:8765` (change with `--telemetry-port`, `0` to
+disable). Watch a sweep with the monitor panel — over an SSH tunnel when the sweep is on the host:
+
+```
+ssh -N -L 8765:127.0.0.1:8765 gpu      # forward the port from the GPU host
+python monitor.py                       # progress bar, rate, ETA, pass/fail tallies, current run
 ```
 
 Host preparation is scripted in `scripts/setup_host.sh` (clone + venv + vLLM, no model load) and

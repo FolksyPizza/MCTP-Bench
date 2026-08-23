@@ -42,6 +42,8 @@ mctpbench/
   streaming.py    # StreamingRunner: raw capture + per-token timeline + native usage
   records.py      # RunRecord schema and ResultStore (the storage tree)
   pipeline.py     # multi-handoff runner for the swarm tier (state threaded across stages)
+  orchestrate.py  # checkpoint/resume, ETA/progress, time-window and pause/stop control
+  telemetry.py    # live status over a localhost socket (for monitor.py)
   harness.py      # run_episode(...) and record_real(...) for model-in-the-loop runs
   scoring.py      # aggregate report grouped by (scenario, condition, runner)
   tokenizers.py   # token counting: heuristic, tiktoken encodings, optional Hugging Face
@@ -53,6 +55,7 @@ extraction/      # repo -> MCTP graph: heuristic.py (deterministic floor), llm.p
 run.py           # in-house scenario CLI
 run_benchmark.py # large-scale matrix runner (suite x models x conditions x trials)
 bench_plan.py    # the run plan: suites, model waves, trials, total run count
+monitor.py       # live dashboard: connects to the runner's telemetry socket
 analyze.py       # pricing + committed aggregate tables
 scripts/         # host setup and dataset fetch (run on the GPU host)
 results/         # the storage tree (see docs/DATA-MODEL.md)
