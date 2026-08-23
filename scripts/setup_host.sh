@@ -26,9 +26,9 @@ python3 -m venv .venv
 # shellcheck disable=SC1091
 source .venv/bin/activate
 python -m pip install --upgrade pip
-# Harness dependencies: tiktoken (reference tokenizers). transformers is optional (native HF
-# tokenizers) and pulled in with vLLM anyway.
-python -m pip install tiktoken
+# Harness dependencies: tiktoken (reference tokenizers) and datasets (to fetch/convert the
+# benchmark suites). transformers is optional (native HF tokenizers) and pulled in with vLLM.
+python -m pip install tiktoken datasets
 # Inference server. vLLM brings torch, transformers, and the OpenAI-compatible server.
 python -m pip install vllm
 

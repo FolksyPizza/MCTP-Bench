@@ -49,7 +49,7 @@ SUITES = [
     Suite("mbpp", "low", 500, LOW, phase=0, ready=True, objective=True),
     Suite("gsm8k", "low", 500, LOW, phase=0, ready=True, objective=True),
     Suite("inhouse", "medium", 10, FOUR, phase=1, ready=True, objective=False),
-    Suite("medium_multifile", "medium", 300, FOUR, phase=1, ready=False, objective=False),
+    Suite("multifile", "medium", 300, FOUR, phase=1, ready=True, objective=False),
     Suite("swebench", "high", 500, FOUR, phase=2, ready=True, objective=True),
     Suite("repobench", "high", 300, FOUR, phase=2, ready=True, objective=True),
     Suite("longbench", "high", 400, FOUR, phase=2, ready=True, objective=False),

@@ -35,6 +35,9 @@ def get_adapter(name: str) -> Adapter:
     if name == "longbench":
         from .longbench import LongBenchAdapter
         return LongBenchAdapter()
+    if name == "multifile":
+        from .multifile import MultiFileAdapter
+        return MultiFileAdapter()
     if name == "inhouse":
         from .inhouse import InHouseAdapter
         return InHouseAdapter()

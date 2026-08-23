@@ -17,4 +17,5 @@ data/gsm8k.jsonl
 data/swebench.jsonl
 data/repobench.jsonl
 data/longbench.jsonl
+data/multifile.jsonl
 data/*.jsonl.gz
