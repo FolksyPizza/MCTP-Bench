@@ -180,13 +180,26 @@ class WindowGate:
             return self.start <= now <= self.end
         return now >= self.start or now <= self.end   # wraps midnight
 
-    def wait_until_open(self, log=print, check_every: int = 60) -> None:
-        announced = False
+    def wait_until_open(self, log=print, check_every: int = 60,
+                        on_pause=None, on_resume=None) -> None:
+        """Block until inside the window. `on_pause` runs once when the pause begins (e.g. stop the
+        model server to free the GPU) and `on_resume` once when it ends (e.g. restart it); hook
+        failures are logged, not fatal."""
+        if self.is_open():
+            return
+        log(f"[window] outside {self.spec}; pausing until it opens "
+            f"(now {datetime.datetime.now().strftime('%H:%M')})")
+        _safe_hook(on_pause, "on-pause", log)
         while not self.is_open():
-            if not announced:
-                log(f"[window] outside {self.spec}; pausing until it opens "
-                    f"(now {datetime.datetime.now().strftime('%H:%M')})")
-                announced = True
             time.sleep(check_every)
-        if announced:
-            log(f"[window] inside {self.spec}; resuming")
+        log(f"[window] inside {self.spec}; resuming")
+        _safe_hook(on_resume, "on-resume", log)
+
+
+def _safe_hook(hook, name, log):
+    if hook is None:
+        return
+    try:
+        hook()
+    except Exception as e:
+        log(f"[window] {name} hook failed: {type(e).__name__}: {e}")

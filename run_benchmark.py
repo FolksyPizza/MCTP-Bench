@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import subprocess
 import sys
 import time
 
@@ -115,6 +116,14 @@ def run_one(store, adapter, task, condition, model, trial, runner, tok, *,
     return rec
 
 
+def _shell_hook(cmd):
+    """A callable that runs a shell command (or None). Used for --on-pause / --on-resume so the
+    model server can be stopped when the window closes and restarted when it reopens."""
+    if not cmd:
+        return None
+    return lambda: subprocess.run(cmd, shell=True, check=False)
+
+
 def _parse_models(spec: str, default_url: str) -> list:
     """Parse '--models' into [(model_id, endpoint_url)]. A model may carry its own endpoint as
     'model@http://host:port/v1'; bare models use default_url."""
@@ -166,6 +175,11 @@ def main():
                     help="print an ETA/progress line every N runs")
     ap.add_argument("--telemetry-port", type=int, default=8765,
                     help="serve live telemetry on 127.0.0.1:<port> for monitor.py (0 disables)")
+    ap.add_argument("--on-pause", default=None,
+                    help="shell command run when a --window pause begins (e.g. stop vLLM to free "
+                         "the GPU)")
+    ap.add_argument("--on-resume", default=None,
+                    help="shell command run when the window reopens (e.g. restart vLLM)")
     args = ap.parse_args()
 
     adapter = get_adapter(args.suite)
@@ -241,7 +255,8 @@ def main():
                       f"Re-run with --resume to continue.")
                 stopped = True
                 break
-            gate.wait_until_open()
+            gate.wait_until_open(on_pause=_shell_hook(args.on_pause),
+                                 on_resume=_shell_hook(args.on_resume))
 
             runner = runners.get(model) or runners.setdefault(model, make_runner(model))
             summ = summarizer_for(runner) if condition == "summary" else None

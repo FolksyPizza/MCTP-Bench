@@ -211,6 +211,22 @@ python analyze.py    # pricing + aggregate tables
 
 # a fast first run (one small model, low-context suites, a few tasks each):
 bash scripts/smoke.sh <model-id> http://localhost:8000/v1
+# broadest coverage — one task from EVERY suite/category, all conditions:
+bash scripts/smoke.sh <model-id> http://localhost:8000/v1 all
+```
+
+Model lifecycle (unload when not in use): each vLLM process holds its model in GPU memory for its
+lifetime, so the harness manages that lifetime rather than keeping models resident.
+`scripts/serve_vllm.sh` / `scripts/stop_vllm.sh` start and stop a server (freeing the GPU), and
+`scripts/run_wave.sh "modelA modelB" "suite..."` runs a wave that starts vLLM per model, runs the
+suites, and stops it before the next model — so only the model in use holds the GPU. For an
+off-hours sweep, `--window` combined with `--on-pause`/`--on-resume` unloads the model while the
+window is closed and reloads it when it reopens:
+
+```
+python run_benchmark.py --suite mbpp --models <id> --window 23:00-06:00 \
+    --on-pause 'bash scripts/stop_vllm.sh 8000' \
+    --on-resume 'bash scripts/serve_vllm.sh <hf-model> 8000'
 ```
 
 Because each vLLM process serves one model, a sweep targets a model's own endpoint. `--url` is the
