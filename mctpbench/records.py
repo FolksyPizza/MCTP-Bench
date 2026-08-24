@@ -45,6 +45,8 @@ class RunRecord:
 
     # input delivered to the receiver
     context_tokens: int = 0
+    context_truncated: bool = False    # context exceeded the window and was trimmed
+    context_tokens_original: int = 0   # pre-truncation size (== context_tokens when not trimmed)
     packet_node_ids: list = field(default_factory=list)
     prep_tokens: int = 0           # summarizer / embedding cost for this condition
 

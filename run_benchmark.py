@@ -57,12 +57,27 @@ def _tok(text: str, t: str) -> int:
 
 def execute_run(store, *, suite, task_id, tier, source, condition, model, trial, runner, tok,
                 instruction=None, objective=None, summarizer=None, endpoint="", temperature=0.0,
-                seed=1, max_tokens=None):
+                seed=1, max_tokens=None, max_context_tokens=0):
     """Build one condition's context, run the receiver, score, and record. Returns
-    (RunRecord, answer_text). Reused by the matrix runner and the multi-handoff pipeline."""
+    (RunRecord, answer_text). Reused by the matrix runner and the multi-handoff pipeline.
+
+    `max_context_tokens` fits the context to the model window: anything larger is trimmed
+    (head+tail) and flagged. A small mctp packet passes through untouched while a long transcript
+    is trimmed, and that difference is recorded per run."""
     built = build(source, condition, summarizer=summarizer)
-    result = runner.run(task=source.task, context=built.text, retrievable=built.retrievable,
-                        question=instruction)
+    # When the packet carries artifact references (mctp), tell the receiver it can pull them —
+    # the OSS suites' own instructions don't mention the RETRIEVE mechanism, so without this the
+    # model never retrieves and the mctp condition is unfairly starved of context.
+    q = instruction
+    if built.retrievable:
+        ids = " ".join(built.retrievable)
+        q = (f"{instruction or ''}\n\nReferenced items available on demand: {ids}. If you need an "
+             f"item's full contents to answer, reply with exactly one line: RETRIEVE <id> "
+             f"[<id> ...] — the contents will then be provided and you can answer.")
+    orig_context_tokens = _tok(built.text, tok)
+    context_text, truncated = tokenizers.truncate_to_tokens(built.text, max_context_tokens)
+    result = runner.run(task=source.task, context=context_text, retrievable=built.retrievable,
+                        question=q)
 
     answer = result.answer
     reasoning = getattr(result, "reasoning", "") or ""
@@ -90,7 +105,8 @@ def execute_run(store, *, suite, task_id, tier, source, condition, model, trial,
         condition=condition, model=model, model_size_b=_size_b(model),
         reasoning=_is_reasoning(model), trial=trial,
         started_at=_iso(getattr(result, "started_at", 0.0)),
-        context_tokens=_tok(built.text, tok), packet_node_ids=built.packet_node_ids,
+        context_tokens=_tok(context_text, tok), context_truncated=truncated,
+        context_tokens_original=orig_context_tokens, packet_node_ids=built.packet_node_ids,
         prep_tokens=built.prep_tokens,
         retrieved_ids=retrieved, retrieved_tokens=retrieved_tokens,
         codebase_reads=getattr(result, "codebase_reads", 0),
@@ -108,13 +124,14 @@ def execute_run(store, *, suite, task_id, tier, source, condition, model, trial,
 
 
 def run_one(store, adapter, task, condition, model, trial, runner, tok, *,
-            summarizer=None, endpoint="", temperature=0.0, seed=1, max_tokens=None) -> RunRecord:
+            summarizer=None, endpoint="", temperature=0.0, seed=1, max_tokens=None,
+            max_context_tokens=0) -> RunRecord:
     rec, _ = execute_run(
         store, suite=adapter.name, task_id=task.task_id, tier=task.source.tier,
         source=task.source, condition=condition, model=model, trial=trial, runner=runner,
         tok=tok, instruction=task.receiver_instruction, objective=task.objective,
         summarizer=summarizer, endpoint=endpoint, temperature=temperature, seed=seed,
-        max_tokens=max_tokens)
+        max_tokens=max_tokens, max_context_tokens=max_context_tokens)
     return rec
 
 
@@ -174,6 +191,10 @@ def main():
     ap.add_argument("--url", default="http://localhost:8000/v1")
     ap.add_argument("--api-key", default="EMPTY")
     ap.add_argument("--max-tokens", type=int, default=2048)
+    ap.add_argument("--max-context-tokens", type=int, default=0,
+                    help="trim a condition's context to this many tokens (head+tail) to fit the "
+                         "model window; 0 = no trimming. Set below (window - max-tokens) for "
+                         "high-context suites. Truncation is flagged per run.")
     ap.add_argument("--temperature", type=float, default=0.0)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--results", default=os.path.join(_HERE, "results"))
@@ -318,7 +339,8 @@ def main():
                                         endpoint="" if args.dry_run else url_of[stage_models[0]],
                                         temperature=args.temperature, seed=args.seed,
                                         max_tokens=args.max_tokens, stage_models=stage_models,
-                                        runner_for=get_runner, arrangement=model)
+                                        runner_for=get_runner, arrangement=model,
+                                        max_context_tokens=args.max_context_tokens)
                     objs = [r.objective_pass for r in recs]
                     obj = [("-" if o is None else "pass" if o else "FAIL") for o in objs]
                     outcome = ("fail" if any(o is False for o in objs)
@@ -330,7 +352,8 @@ def main():
                     rec = run_one(store, adapter, task, condition, model, trial, runner, tok,
                                   summarizer=summ, endpoint=endpoint,
                                   temperature=args.temperature, seed=args.seed,
-                                  max_tokens=args.max_tokens)
+                                  max_tokens=args.max_tokens,
+                                  max_context_tokens=args.max_context_tokens)
                     outcome = ("none" if rec.objective_pass is None
                                else "pass" if rec.objective_pass else "fail")
                     line = (f"{task.task_id:22.22} {condition:10} {model:18.18} t{trial} "

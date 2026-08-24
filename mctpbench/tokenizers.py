@@ -90,6 +90,34 @@ def default() -> str:
     return "tiktoken:o200k_base" if "tiktoken:o200k_base" in a else HEURISTIC
 
 
+def truncate_to_tokens(text: str, max_tokens: int, head_frac: float = 0.6,
+                       marker: str = "\n\n...[TRUNCATED FOR CONTEXT WINDOW]...\n\n"):
+    """Truncate text to at most `max_tokens`, keeping the head and tail (the middle is usually the
+    most droppable). Slicing uses the o200k_base encoding when tiktoken is present (fast and
+    reversible), else a character-proportional fallback; either way the result is a conservative
+    fit. Returns (text, was_truncated). A packet already under budget is returned unchanged — so on
+    a long-context task the small mctp packet passes through while the raw transcript is trimmed,
+    which is itself a measurable difference."""
+    if max_tokens <= 0:
+        return text, False
+    try:
+        enc = _tiktoken("o200k_base")
+        ids = enc.encode(text, disallowed_special=())
+        if len(ids) <= max_tokens:
+            return text, False
+        head = int(max_tokens * head_frac)
+        tail = max_tokens - head
+        return enc.decode(ids[:head]) + marker + enc.decode(ids[-tail:]), True
+    except Exception:
+        # heuristic fallback: ~4 chars/token
+        budget = max_tokens * 4
+        if len(text) <= budget:
+            return text, False
+        head = int(budget * head_frac)
+        tail = budget - head
+        return text[:head] + marker + text[-tail:], True
+
+
 def count(text: str, tokenizer: str = HEURISTIC) -> int:
     if tokenizer == HEURISTIC:
         return _heuristic(text)

@@ -18,9 +18,7 @@ import json
 import os
 import re
 
-from conditions import Source
-
-from .base import Adapter, Task
+from .base import Adapter, Task, source_from_repo
 
 _HERE = os.path.dirname(__file__)
 _INSTRUCTION = (
@@ -72,10 +70,13 @@ class LongBenchAdapter(Adapter):
                 subtask = p.get("task", "")
                 objective = _any_match(answers) if (answers and subtask in _OBJECTIVE_TASKS) \
                     else None
+                # Give mctp a graph so its packet references the document (retrievable on demand)
+                # rather than an empty packet: the document becomes an artifact node linked to the
+                # question. transcript/summary/rag still see the document inline via docs.
+                src = source_from_repo(self.name, tid, p["input"],
+                                       {"document.txt": p["context"]}, tier=self.tier)
                 yield Task(
-                    task_id=tid,
-                    source=Source(suite=self.name, task_id=tid, task=p["input"],
-                                  tier=self.tier, transcript=p["context"]),
+                    task_id=tid, source=src,
                     receiver_instruction=_INSTRUCTION, objective=objective,
                     gold=answers[0] if answers else "",
                     meta={"subtask": subtask},

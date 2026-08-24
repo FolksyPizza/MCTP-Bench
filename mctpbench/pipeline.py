@@ -58,7 +58,8 @@ def build_arrangements(models: list, kinds=("same", "cross"), n_stages: int = 3)
 
 def run_pipeline(store, swarm_task, condition, model, trial, runner, tok, *, summarizer=None,
                  endpoint="", temperature=0.0, seed=1, max_tokens=None,
-                 stage_models=None, runner_for=None, arrangement=None) -> list:
+                 stage_models=None, runner_for=None, arrangement=None,
+                 max_context_tokens=0) -> list:
     """Run one swarm task under one condition, threading state across stages. Returns the list
     of per-stage RunRecords.
 
@@ -110,7 +111,8 @@ def run_pipeline(store, swarm_task, condition, model, trial, runner, tok, *, sum
             tier="subagent", source=src, condition=condition, model=stage_model, trial=trial,
             runner=stage_runner, tok=tok, instruction=stage.receiver_instruction,
             objective=stage.objective, summarizer=stage_summ, endpoint=stage_endpoint,
-            temperature=temperature, seed=seed, max_tokens=max_tokens)
+            temperature=temperature, seed=seed, max_tokens=max_tokens,
+            max_context_tokens=max_context_tokens)
         records.append(rec)
 
         transcript += f"\n\n=== {stage.role} ({stage_model}) output ===\n{answer}"
