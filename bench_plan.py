@@ -45,9 +45,12 @@ class Wave:
 
 
 SUITES = [
-    Suite("humaneval", "low", 164, LOW, phase=0, ready=True, objective=True),
-    Suite("mbpp", "low", 500, LOW, phase=0, ready=True, objective=True),
-    Suite("gsm8k", "low", 500, LOW, phase=0, ready=True, objective=True),
+    # Every context type runs all four conditions (transcript/summary/rag/mctp), including the
+    # low-context suites — for a uniform sweep, even though on stateless tasks the non-transcript
+    # conditions largely coincide.
+    Suite("humaneval", "low", 164, FOUR, phase=0, ready=True, objective=True),
+    Suite("mbpp", "low", 500, FOUR, phase=0, ready=True, objective=True),
+    Suite("gsm8k", "low", 500, FOUR, phase=0, ready=True, objective=True),
     Suite("inhouse", "medium", 10, FOUR, phase=1, ready=True, objective=False),
     Suite("multifile", "medium", 300, FOUR, phase=1, ready=True, objective=False),
     Suite("swebench", "high", 500, FOUR, phase=2, ready=True, objective=True),
@@ -72,9 +75,25 @@ WAVES = [
 # single-model artifact. The swarm suite already exercises multiple agent roles, so it is exempt.
 MIN_MODELS_SINGLE_AGENT = 2
 
+# Swarm agent arrangements per wave: same-family (one per family present) + cross-family. Computed
+# from the wave model lists so the count stays in sync with the model suite.
+from mctpbench.pipeline import build_arrangements  # noqa: E402
 
-def receiver_runs(suite: Suite, n_models: int) -> int:
-    return suite.tasks * len(suite.conditions) * n_models * TRIALS * suite.agents_per_task
+_ARR = {w.name: len(build_arrangements([m for m, _ in w.models])) for w in WAVES}
+ARRANGEMENTS_TOTAL = sum(_ARR.values())
+
+
+def _multiplier(suite: Suite, n_models: int, wave: str | None) -> int:
+    """The model dimension: for swarm it is the number of agent arrangements, otherwise the model
+    count. `wave` selects a single wave's arrangements; None means both waves combined."""
+    if suite.name == "swarm":
+        return _ARR[wave] if wave else ARRANGEMENTS_TOTAL
+    return n_models
+
+
+def receiver_runs(suite: Suite, n_models: int, wave: str | None = None) -> int:
+    m = _multiplier(suite, n_models, wave)
+    return suite.tasks * len(suite.conditions) * m * TRIALS * suite.agents_per_task
 
 
 def _fmt(n: int) -> str:
@@ -94,7 +113,7 @@ def print_plan():
     total_recv = 0
     open_ended_outputs = 0
     for s in SUITES:
-        rw = receiver_runs(s, n_models_per_wave)
+        rw = receiver_runs(s, n_models_per_wave, wave=WAVES[0].name)
         both = receiver_runs(s, total_models)
         total_recv += both
         outputs = both  # one output per receiver run

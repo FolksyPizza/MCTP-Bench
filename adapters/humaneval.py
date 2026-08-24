@@ -43,7 +43,7 @@ def _dataset_path() -> str:
 class HumanEvalAdapter(Adapter):
     name = "humaneval"
     tier = "small"
-    default_conditions = ("transcript", "mctp")
+    default_conditions = ("transcript", "summary", "rag", "mctp")
 
     def __init__(self, path: str | None = None):
         self.path = path or _dataset_path()

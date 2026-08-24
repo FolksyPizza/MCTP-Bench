@@ -36,7 +36,7 @@ def _path() -> str:
 class MBPPAdapter(Adapter):
     name = "mbpp"
     tier = "low"
-    default_conditions = ("transcript", "mctp")
+    default_conditions = ("transcript", "summary", "rag", "mctp")
 
     def __init__(self, path: str | None = None):
         self.path = path or _path()

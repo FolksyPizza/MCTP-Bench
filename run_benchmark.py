@@ -195,6 +195,9 @@ def main():
                     help="retry a run this many times on a transient (network/5xx) error")
     ap.add_argument("--stop-ollama", action="store_true",
                     help="stop all loaded Ollama models at startup to free the GPU for vLLM")
+    ap.add_argument("--arrangements", default="same,cross",
+                    help="swarm only: agent arrangements to run — 'same' (one family per pipeline) "
+                         "and/or 'cross' (different families across roles)")
     ap.add_argument("--telemetry-port", type=int, default=8765,
                     help="serve live telemetry on 127.0.0.1:<port> for monitor.py (0 disables)")
     ap.add_argument("--on-pause", default=None,
@@ -229,9 +232,25 @@ def main():
         mode = "  ".join(f"{n}@{u}" for n, u in specs)
 
     tasks = list(adapter.tasks(limit=args.limit))
-    total = len(tasks) * len(models) * len(conditions) * args.trials
+
+    # For swarm, the "model" dimension is the agent arrangement (which model plays each role);
+    # for every other suite it is the model list.
+    swarm_arrangements = None
+    if args.suite == "swarm":
+        from mctpbench.pipeline import build_arrangements
+        arr = build_arrangements(models, kinds=tuple(k for k in args.arrangements.split(",") if k))
+        swarm_arrangements = dict(arr)
+        model_units = list(swarm_arrangements)
+    else:
+        model_units = models
+
+    total = len(tasks) * len(model_units) * len(conditions) * args.trials
     print(f"suite={args.suite}  {mode}  conditions={conditions}  "
-          f"tasks={len(tasks)}  trials={args.trials}  -> {total} runs  tokenizer={tok}\n")
+          f"tasks={len(tasks)}  trials={args.trials}  -> {total} runs  tokenizer={tok}")
+    if swarm_arrangements:
+        for name, sm in arr:
+            print(f"    arrangement {name}: {' -> '.join(sm)}")
+    print()
 
     store.write_config(f"{args.suite}_batch.json", {
         "suite": args.suite, "models": models, "endpoints": url_of, "conditions": conditions,
@@ -248,7 +267,7 @@ def main():
 
     manifest = Manifest(os.path.join(args.results, "progress", f"{args.suite}.log"))
     gate = WindowGate(args.window)
-    jobs = [(m, task, c, tr) for m in models for task in tasks for c in conditions
+    jobs = [(m, task, c, tr) for m in model_units for task in tasks for c in conditions
             for tr in range(1, args.trials + 1)]
     pending = [(m, task, c, tr) for (m, task, c, tr) in jobs
                if not (args.resume and manifest.has(run_key(args.suite, task.task_id, c, m, tr)))]
@@ -282,19 +301,24 @@ def main():
         """Execute one job (a swarm pipeline or a single run), with retries, then record under
         the lock. A StreamingRunner has no shared mutable state, so one per model is shared safely
         across workers; the shared collectors (store shard, manifest, progress) are locked."""
-        model, task, condition, trial = job
-        runner = get_runner(model)
-        summ = summarizer_for(runner) if condition == "summary" else None
-        endpoint = "" if args.dry_run else url_of[model]
+        model, task, condition, trial = job   # for swarm, `model` is the arrangement name
+        is_swarm = args.suite == "swarm"
+        if not is_swarm:
+            runner = get_runner(model)
+            summ = summarizer_for(runner) if condition == "summary" else None
+            endpoint = "" if args.dry_run else url_of[model]
         t0 = time.monotonic()
         for attempt in range(args.retries + 1):
             try:
-                if args.suite == "swarm":
+                if is_swarm:
                     from mctpbench.pipeline import run_pipeline
-                    recs = run_pipeline(store, task, condition, model, trial, runner, tok,
-                                        summarizer=summ, endpoint=endpoint,
+                    stage_models = swarm_arrangements[model]
+                    lead = get_runner(stage_models[0])
+                    recs = run_pipeline(store, task, condition, stage_models[0], trial, lead, tok,
+                                        endpoint="" if args.dry_run else url_of[stage_models[0]],
                                         temperature=args.temperature, seed=args.seed,
-                                        max_tokens=args.max_tokens)
+                                        max_tokens=args.max_tokens, stage_models=stage_models,
+                                        runner_for=get_runner, arrangement=model)
                     objs = [r.objective_pass for r in recs]
                     obj = [("-" if o is None else "pass" if o else "FAIL") for o in objs]
                     outcome = ("fail" if any(o is False for o in objs)
