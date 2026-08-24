@@ -73,8 +73,11 @@ class JudgeModel:
         raw = self._runner._chat([{"role": "user", "content": prompt}])
         return _extract_json(raw), raw
 
-    def score(self, task: str, gold: str, answer: str) -> tuple:
-        return self._ask(SCORE_PROMPT.format(task=task, gold=gold, answer=answer))
+    def score(self, task: str, gold: str, answer: str, native_note: str = "") -> tuple:
+        prompt = SCORE_PROMPT.format(task=task, gold=gold, answer=answer)
+        if native_note:
+            prompt += f"\n\n{native_note}"
+        return self._ask(prompt)
 
     def review(self, task: str, gold: str, answer: str, others: str) -> tuple:
         return self._ask(REVIEW_PROMPT.format(task=task, gold=gold, answer=answer, others=others))
@@ -141,14 +144,15 @@ def _others_blurb(per_judge: dict, exclude: str) -> str:
 
 
 def judge_one(judges: list, task: str, gold: str, answer: str, samples_per_judge: int,
-              cross_review: bool = True) -> dict:
+              cross_review: bool = True, native_note: str = "") -> dict:
     """Score one output. Returns a full record including raw judge I/O. The primary label is
-    the independent panel; cross-review (if enabled) is a separate, secondary layer."""
+    the independent panel; cross-review (if enabled) is a separate, secondary layer. `native_note`
+    (e.g. a SWE-bench test-harness verdict) is shown to each judge as context when present."""
     round1, per_judge = [], {}
     for j in judges:
         scores, passes, first = [], [], None
         for s in range(samples_per_judge):
-            verdict, raw = j.score(task, gold, answer)
+            verdict, raw = j.score(task, gold, answer, native_note=native_note)
             round1.append({"judge_model": j.model, "sample": s, "raw": raw, **verdict})
             if _num(verdict.get("score")) is not None:
                 scores.append(verdict["score"])
@@ -202,13 +206,25 @@ def run_judge_pass(results_root: str, judge_models: list, base_url: str, api_key
     os.makedirs(judge_dir, exist_ok=True)
     golds = golds or {}
 
+    # SWE-bench native test verdicts (when the native pass has run) are shown to the judges.
+    try:
+        from scoring.swebench_native import native_results
+        native = native_results(results_root)
+    except Exception:
+        native = {}
+
     for rec in _load_records(results_root):
         if only_conditions and rec["condition"] not in only_conditions:
             continue
         answer = _read(results_root, rec.get("output_ref", ""))
         gold = golds.get(rec["task_id"], rec.get("task_id", ""))
+        note = ""
+        nat = native.get(rec["run_id"])
+        if nat is not None:
+            note = ("For reference, an automated test harness reports this response's patch "
+                    f"{'RESOLVED' if nat['native_pass'] else 'did NOT resolve'} the issue.")
         result = judge_one(judges, rec["task_id"], gold, answer, samples_per_judge,
-                           cross_review=cross_review)
+                           cross_review=cross_review, native_note=note)
         out = {"run_id": rec["run_id"], "task_id": rec["task_id"],
                "condition": rec["condition"], "model": rec["model"], "trial": rec.get("trial"),
                "judge_models": judge_models, "samples_per_judge": samples_per_judge,
