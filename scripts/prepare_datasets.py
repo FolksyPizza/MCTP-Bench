@@ -62,21 +62,31 @@ def prepare_gsm8k(limit):
 
 
 def prepare_longbench(limit):
-    from datasets import load_dataset
+    # LongBench is a script-based dataset (removed in datasets v5); its data ships as a single
+    # data.zip of per-task JSONL files, so download and read those directly.
+    import zipfile
+    from huggingface_hub import hf_hub_download
+    zip_path = hf_hub_download("THUDM/LongBench", "data.zip", repo_type="dataset")
+    extract_dir = os.path.join(DATA, "_longbench_extract")
+    with zipfile.ZipFile(zip_path) as z:
+        z.extractall(extract_dir)
     per_config = max(1, (limit or 700) // len(_LONGBENCH_CONFIGS))
     rows = []
     for cfg in _LONGBENCH_CONFIGS:
-        try:
-            ds = load_dataset("THUDM/LongBench", cfg, split="test")
-        except Exception as e:  # a config may be unavailable; keep going
-            print(f"  (skip longbench:{cfg}: {type(e).__name__})")
+        path = next((p for p in (os.path.join(extract_dir, "data", cfg + ".jsonl"),
+                                 os.path.join(extract_dir, cfg + ".jsonl"))
+                     if os.path.exists(p)), None)
+        if not path:
+            print(f"  (skip longbench:{cfg}: file not found in data.zip)")
             continue
-        for i, r in enumerate(ds):
-            if i >= per_config:
-                break
-            rows.append({"_id": r.get("_id", f"{cfg}-{i}"), "task": cfg,
-                         "input": r["input"], "context": r["context"],
-                         "answers": r.get("answers", [])})
+        with open(path) as f:
+            for i, line in enumerate(f):
+                if i >= per_config:
+                    break
+                r = json.loads(line)
+                rows.append({"_id": r.get("_id", f"{cfg}-{i}"), "task": cfg,
+                             "input": r["input"], "context": r["context"],
+                             "answers": r.get("answers", [])})
     _write("longbench", rows)
 
 
