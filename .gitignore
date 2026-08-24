@@ -21,3 +21,4 @@ data/longbench.jsonl
 data/multifile.jsonl
 data/*.jsonl.gz
 data/_repo_cache/
+data/swarm.jsonl

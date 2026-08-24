@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime
 import os
 import signal
+import threading
 import time
 
 
@@ -28,6 +29,7 @@ class Manifest:
     def __init__(self, path: str):
         self.path = path
         self.done = set()
+        self._lock = threading.Lock()   # add() is called from concurrent workers
         os.makedirs(os.path.dirname(path), exist_ok=True)
         if os.path.exists(path):
             with open(path) as f:
@@ -41,11 +43,12 @@ class Manifest:
         return key in self.done
 
     def add(self, key: str) -> None:
-        if key in self.done:
-            return
-        self.done.add(key)
-        self._fh.write(key + "\n")
-        self._fh.flush()
+        with self._lock:
+            if key in self.done:
+                return
+            self.done.add(key)
+            self._fh.write(key + "\n")
+            self._fh.flush()
 
     def close(self) -> None:
         try:

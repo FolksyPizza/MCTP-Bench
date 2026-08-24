@@ -53,14 +53,24 @@ SUITES = [
     Suite("swebench", "high", 500, FOUR, phase=2, ready=True, objective=True),
     Suite("repobench", "high", 300, FOUR, phase=2, ready=True, objective=True),
     Suite("longbench", "high", 400, FOUR, phase=2, ready=True, objective=False),
-    Suite("swarm", "subagent", 30, FOUR, phase=3, ready=True, agents_per_task=3,
+    Suite("swarm", "subagent", 40, FOUR, phase=3, ready=True, agents_per_task=3,
           objective=False),
 ]
 
+# A suite of different models per wave, spanning families (Qwen, Llama, Gemma) so results are not
+# tied to one lineage. Each wave includes a reasoning model (marked *). The large wave's 32B
+# models need AWQ/GPTQ quantization to fit 2x24GB via tensor-parallel.
 WAVES = [
-    Wave("small", [("qwen2.5-coder:14b", False), ("llama3.1:8b", False), ("qwen3:8b", True)]),
-    Wave("large", [("gemma3:27b", False), ("qwen2.5:32b", False), ("qwen3:32b", True)]),
+    Wave("small", [("qwen2.5-coder:7b", False), ("qwen2.5-coder:14b", False),
+                   ("llama3.1:8b", False), ("gemma2:9b", False), ("qwen3:8b", True)]),
+    Wave("large", [("gemma3:27b", False), ("qwen2.5:32b-awq", False),
+                   ("qwen2.5-coder:32b-awq", False), ("qwen3:32b-awq", True)]),
 ]
+
+# Model policy: a single-agent test (every suite except the multi-agent `swarm`) must run on at
+# least this many distinct models, so any MCTP effect is shown to hold across models and is not a
+# single-model artifact. The swarm suite already exercises multiple agent roles, so it is exempt.
+MIN_MODELS_SINGLE_AGENT = 2
 
 
 def receiver_runs(suite: Suite, n_models: int) -> int:
@@ -97,8 +107,18 @@ def print_plan():
     print(f"\nWAVES (trials={TRIALS}; reasoning model in each)")
     for w in WAVES:
         models = ", ".join(f"{m}{'*' if r else ''}" for m, r in w.models)
-        print(f"  {w.name:<6} {models}")
+        has_reasoning = "ok" if any(r for _, r in w.models) else "MISSING"
+        print(f"  {w.name:<6} ({len(w.models)} models, reasoning={has_reasoning})  {models}")
     print("  * = reasoning model")
+
+    print("\nMODEL POLICY")
+    print(f"  single-agent suites run on all {total_models} models across the two waves "
+          f"(>= {MIN_MODELS_SINGLE_AGENT} required, so an MCTP effect is cross-model, not a "
+          f"single-model artifact)")
+    print("  the multi-agent `swarm` suite is exempt (it already spans multiple agent roles)")
+    small_ok = len(WAVES[0].models) >= MIN_MODELS_SINGLE_AGENT
+    print(f"  smallest wave has {len(WAVES[0].models)} models: "
+          f"{'satisfies' if small_ok else 'VIOLATES'} the >= {MIN_MODELS_SINGLE_AGENT} rule")
 
     ready_recv = sum(receiver_runs(s, total_models) for s in SUITES if s.ready)
     print("\nRECEIVER RUNS (tasks x conditions x models x trials x agents)")

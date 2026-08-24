@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import threading
 import uuid
 from dataclasses import asdict, dataclass, field
 
@@ -122,6 +123,7 @@ class ResultStore:
     def __init__(self, root: str, harness_repo: str | None = None):
         self.root = root
         self.harness_commit = _git_commit(harness_repo or os.getcwd())
+        self._shard_lock = threading.Lock()   # shard JSONLs are shared across concurrent workers
         for sub in ("runs", "raw", "outputs", "judge", "aggregates", "configs"):
             os.makedirs(os.path.join(root, sub), exist_ok=True)
 
@@ -168,9 +170,11 @@ class ResultStore:
         record.ref_token_counts = ref_token_counts(prompt, output, reasoning)
 
         shard = os.path.join(self.root, "runs", _safe(record.suite), _safe(record.model))
-        os.makedirs(shard, exist_ok=True)
-        with open(os.path.join(shard, f"{record.condition}.jsonl"), "a") as f:
-            f.write(json.dumps(record.to_json()) + "\n")
+        line = json.dumps(record.to_json()) + "\n"
+        with self._shard_lock:
+            os.makedirs(shard, exist_ok=True)
+            with open(os.path.join(shard, f"{record.condition}.jsonl"), "a") as f:
+                f.write(line)
         return record
 
     def write_config(self, name: str, config: dict) -> str:

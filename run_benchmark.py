@@ -21,7 +21,9 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -116,6 +118,19 @@ def run_one(store, adapter, task, condition, model, trial, runner, tok, *,
     return rec
 
 
+def _stop_ollama_models():
+    """Stop every currently-loaded Ollama model, freeing the GPU (vLLM and Ollama can't share the
+    cards here). Best-effort: prints and continues if the ollama CLI is absent."""
+    try:
+        out = subprocess.run(["ollama", "ps"], capture_output=True, text=True, timeout=10)
+        names = [ln.split()[0] for ln in out.stdout.splitlines()[1:] if ln.split()]
+        for name in names:
+            subprocess.run(["ollama", "stop", name], timeout=30, capture_output=True)
+        print(f"[stop-ollama] stopped {len(names)} model(s): {', '.join(names) or 'none'}")
+    except Exception as e:
+        print(f"[stop-ollama] skipped ({type(e).__name__}: {e})")
+
+
 def _shell_hook(cmd):
     """A callable that runs a shell command (or None). Used for --on-pause / --on-resume so the
     model server can be stopped when the window closes and restarted when it reopens."""
@@ -173,6 +188,13 @@ def main():
                     help="stop cleanly after this many hours; --resume continues later")
     ap.add_argument("--progress-every", type=int, default=25,
                     help="print an ETA/progress line every N runs")
+    ap.add_argument("--concurrency", type=int, default=1,
+                    help="number of runs in flight at once; >1 lets vLLM batch (use lower values "
+                         "for long-context suites where KV cache caps the batch)")
+    ap.add_argument("--retries", type=int, default=2,
+                    help="retry a run this many times on a transient (network/5xx) error")
+    ap.add_argument("--stop-ollama", action="store_true",
+                    help="stop all loaded Ollama models at startup to free the GPU for vLLM")
     ap.add_argument("--telemetry-port", type=int, default=8765,
                     help="serve live telemetry on 127.0.0.1:<port> for monitor.py (0 disables)")
     ap.add_argument("--on-pause", default=None,
@@ -221,51 +243,51 @@ def main():
     tele.update(suite=args.suite, models=models, conditions=conditions, total=total,
                 done=0, running=True, tallies={"pass": 0, "fail": 0, "none": 0, "error": 0})
 
+    if args.stop_ollama and not args.dry_run:
+        _stop_ollama_models()
+
     manifest = Manifest(os.path.join(args.results, "progress", f"{args.suite}.log"))
     gate = WindowGate(args.window)
     jobs = [(m, task, c, tr) for m in models for task in tasks for c in conditions
             for tr in range(1, args.trials + 1)]
-    already = sum(1 for m, task, c, tr in jobs
-                  if args.resume and manifest.has(run_key(args.suite, task.task_id, c, m, tr)))
+    pending = [(m, task, c, tr) for (m, task, c, tr) in jobs
+               if not (args.resume and manifest.has(run_key(args.suite, task.task_id, c, m, tr)))]
+    already = len(jobs) - len(pending)
     progress = Progress(total=total, done=already)
     if already:
         print(f"resume: {already}/{total} already recorded — skipping those\n")
+    print(f"concurrency={args.concurrency}  retries={args.retries}\n")
 
     stop_file = os.path.join(args.results, "progress", f"{args.suite}.stop")
     stopper = StopController(stop_file).install()
     print(f"controls: resume={args.resume}  window={args.window or 'always'}  "
           f"pause/stop: Ctrl-C or `touch {os.path.relpath(stop_file)}`\n")
 
-    n = 0
     stop_at = (time.monotonic() + args.max_hours * 3600) if args.max_hours else None
     stopped = False
     runners = {}
     tallies = {"pass": 0, "fail": 0, "none": 0, "error": 0}
-    try:
-        for model, task, condition, trial in jobs:
-            n += 1
-            key = run_key(args.suite, task.task_id, condition, model, trial)
-            if args.resume and manifest.has(key):
-                continue
-            if stopper.should_stop():
-                stopped = True
-                break
-            if stop_at and time.monotonic() >= stop_at:
-                print(f"\n[max-hours] reached {args.max_hours}h budget; stopping cleanly. "
-                      f"Re-run with --resume to continue.")
-                stopped = True
-                break
-            gate.wait_until_open(on_pause=_shell_hook(args.on_pause),
-                                 on_resume=_shell_hook(args.on_resume))
+    results_lock = threading.Lock()   # guards progress, tallies, manifest, printing, telemetry
+    runners_lock = threading.Lock()   # guards lazy runner creation
 
-            runner = runners.get(model) or runners.setdefault(model, make_runner(model))
-            summ = summarizer_for(runner) if condition == "summary" else None
-            endpoint = "" if args.dry_run else url_of[model]
-            tele.update(current={"model": model, "condition": condition, "task": task.task_id},
-                        done=progress.done, remaining=progress.remaining(),
-                        rate_s=round(progress.rate(), 2), eta_s=progress.eta_seconds(),
-                        elapsed_s=round(time.monotonic() - progress.start, 1))
-            t0 = time.monotonic()
+    def get_runner(model):
+        with runners_lock:
+            r = runners.get(model)
+            if r is None:
+                r = make_runner(model)
+                runners[model] = r
+            return r
+
+    def do_run(job):
+        """Execute one job (a swarm pipeline or a single run), with retries, then record under
+        the lock. A StreamingRunner has no shared mutable state, so one per model is shared safely
+        across workers; the shared collectors (store shard, manifest, progress) are locked."""
+        model, task, condition, trial = job
+        runner = get_runner(model)
+        summ = summarizer_for(runner) if condition == "summary" else None
+        endpoint = "" if args.dry_run else url_of[model]
+        t0 = time.monotonic()
+        for attempt in range(args.retries + 1):
             try:
                 if args.suite == "swarm":
                     from mctpbench.pipeline import run_pipeline
@@ -273,14 +295,13 @@ def main():
                                         summarizer=summ, endpoint=endpoint,
                                         temperature=args.temperature, seed=args.seed,
                                         max_tokens=args.max_tokens)
-                    ctx = [r.context_tokens for r in recs]
                     objs = [r.objective_pass for r in recs]
                     obj = [("-" if o is None else "pass" if o else "FAIL") for o in objs]
                     outcome = ("fail" if any(o is False for o in objs)
                                else "pass" if any(objs) else "none")
+                    line = (f"{task.task_id:22.22} {condition:10} {model:18.18} t{trial} "
+                            f"stages={len(recs)} obj={obj}")
                     last = f"{task.task_id} {condition} {model} stages={len(recs)} {outcome}"
-                    print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} {model:18.18} "
-                          f"t{trial} stages={len(recs)} obj={obj} ctx_per_stage={ctx}")
                 else:
                     rec = run_one(store, adapter, task, condition, model, trial, runner, tok,
                                   summarizer=summ, endpoint=endpoint,
@@ -288,29 +309,74 @@ def main():
                                   max_tokens=args.max_tokens)
                     outcome = ("none" if rec.objective_pass is None
                                else "pass" if rec.objective_pass else "fail")
-                    last = (f"{task.task_id} {condition} {model} {outcome} "
-                            f"ctx={rec.context_tokens} out={rec.output_tokens}")
-                    print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} {model:18.18} "
-                          f"t{trial} {outcome:4} ctx={rec.context_tokens} "
-                          f"out_tok={rec.output_tokens} lat={rec.latency_s:.1f}s")
-                manifest.add(key)
-                progress.tick(time.monotonic() - t0)
-                tallies[outcome] += 1
-                tele.update(done=progress.done, remaining=progress.remaining(),
-                            rate_s=round(progress.rate(), 2), eta_s=progress.eta_seconds(),
-                            elapsed_s=round(time.monotonic() - progress.start, 1),
-                            tallies=dict(tallies), last=last)
-                if args.progress_every and progress.done % args.progress_every == 0:
-                    print(f"  -- {progress.line()}")
-            except Exception as e:
-                tallies["error"] += 1
-                tele.update(tallies=dict(tallies),
-                            last=f"{task.task_id} {condition} {model} ERROR {type(e).__name__}")
-                print(f"  [{n}/{total}] {task.task_id:22.22} {condition:10} {model:18.18} "
-                      f"t{trial} ERROR {type(e).__name__}: {e}")
+                    line = (f"{task.task_id:22.22} {condition:10} {model:18.18} t{trial} "
+                            f"{outcome:4} ctx={rec.context_tokens} out_tok={rec.output_tokens} "
+                            f"lat={rec.latency_s:.1f}s")
+                    last = f"{task.task_id} {condition} {model} {outcome}"
+                with results_lock:
+                    manifest.add(run_key(args.suite, task.task_id, condition, model, trial))
+                    progress.tick(time.monotonic() - t0)
+                    tallies[outcome] += 1
+                    print(f"  [{progress.done}/{total}] {line}")
+                    tele.update(done=progress.done, remaining=progress.remaining(),
+                                rate_s=round(progress.rate(), 2), eta_s=progress.eta_seconds(),
+                                elapsed_s=round(time.monotonic() - progress.start, 1),
+                                tallies=dict(tallies), last=last,
+                                current={"model": model, "condition": condition,
+                                         "task": task.task_id})
+                    if args.progress_every and progress.done % args.progress_every == 0:
+                        print(f"  -- {progress.line()}")
+                return
+            except Exception as e:  # transient endpoint error: back off and retry
+                if attempt < args.retries:
+                    time.sleep(2 ** attempt)
+                    continue
+                with results_lock:
+                    tallies["error"] += 1
+                    tele.update(tallies=dict(tallies),
+                                last=f"{task.task_id} {condition} {model} ERROR {type(e).__name__}")
+                    print(f"  [err] {task.task_id:22.22} {condition:10} {model:18.18} t{trial} "
+                          f"ERROR {type(e).__name__}: {e}")
+                return
+
+    pause_hook = _shell_hook(args.on_pause)
+    resume_hook = _shell_hook(args.on_resume)
+    job_iter = iter(pending)
+    exhausted = False
+    futures = set()
+    try:
+        with ThreadPoolExecutor(max_workers=max(1, args.concurrency)) as ex:
+            while True:
+                while (not exhausted and not stopped and len(futures) < args.concurrency
+                       and gate.is_open()):
+                    if stopper.should_stop():
+                        stopped = True
+                        break
+                    if stop_at and time.monotonic() >= stop_at:
+                        print(f"\n[max-hours] reached {args.max_hours}h budget; draining "
+                              f"in-flight runs, then stopping. Re-run with --resume to continue.")
+                        stopped = True
+                        break
+                    job = next(job_iter, None)
+                    if job is None:
+                        exhausted = True
+                        break
+                    futures.add(ex.submit(do_run, job))
+                if not futures:
+                    if stopped or exhausted:
+                        break
+                    if not gate.is_open():   # window closed, nothing in flight: safe to unload
+                        gate.wait_until_open(on_pause=pause_hook, on_resume=resume_hook)
+                        continue
+                    break
+                done, futures = wait(futures, return_when=FIRST_COMPLETED)
+                futures = set(futures)
     except KeyboardInterrupt:
-        print("\n[aborted] checkpoint saved; re-run with --resume to continue.")
+        print("\n[aborted] waiting for in-flight runs to finish; checkpoint saved. "
+              "Re-run with --resume to continue.")
         stopped = True
+        for f in futures:
+            f.result()   # let in-flight runs complete and record
     finally:
         manifest.close()
         stopper.clear_stop_file()

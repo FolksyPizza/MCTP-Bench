@@ -11,6 +11,7 @@ of assertions); the research and testing stages are judged.
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 from dataclasses import dataclass, field
@@ -18,6 +19,8 @@ from typing import Callable, Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from scoring.objective import _run_python, extract_code  # noqa: E402
+
+_HERE = os.path.dirname(__file__)
 
 
 @dataclass
@@ -35,38 +38,50 @@ class SwarmTask:
     stages: list = field(default_factory=list)
 
 
-def _slugify_objective():
+def _asserts_objective(fn: str, asserts: list):
+    """Engineer-stage scorer: run the produced function against the spec's assert statements."""
     def score(answer: str) -> tuple:
         code = extract_code(answer)
-        program = (code + "\n"
-                   "assert slugify('Hello World!') == 'hello-world'\n"
-                   "assert slugify('  A..B  ') == 'a-b'\n"
-                   "assert slugify('already-slug') == 'already-slug'\n")
+        program = code + "\n" + "\n".join(asserts) + "\n"
         return _run_python(program)
     return score
 
 
-def _slugify_pipeline() -> SwarmTask:
-    brief = ("Add a function slugify(text) to the utils module: lowercase the text, replace each "
-             "run of non-alphanumeric characters with a single hyphen, and strip leading and "
-             "trailing hyphens.")
+def _pipeline(task_id: str, brief: str, fn: str, asserts: list) -> SwarmTask:
+    """A research -> implementation -> testing pipeline for one small utility spec."""
     return SwarmTask(
-        task_id="swarm/slugify",
-        brief=brief,
+        task_id=task_id, brief=brief,
         stages=[
             Stage("researcher",
-                  "Specify the exact behavior of slugify, including edge cases (empty string, "
-                  "punctuation runs, leading/trailing symbols, already-slugified input).",
+                  f"Specify the exact behavior of {fn}, including edge cases (empty input, "
+                  f"boundary sizes, already-satisfying input).",
                   "List the required behavior and edge cases as concise bullet points."),
             Stage("engineer",
-                  "Implement slugify(text) in Python according to the specification.",
+                  f"Implement {fn} in Python according to the specification.",
                   "Write the complete function inside a single ```python code block. No prose.",
-                  objective=_slugify_objective()),
+                  objective=_asserts_objective(fn, asserts)),
             Stage("tester",
-                  "Write unit tests for slugify that cover the specified edge cases.",
+                  f"Write unit tests for {fn} that cover the specified edge cases.",
                   "Write the tests as Python assert statements inside a ```python code block."),
         ],
     )
+
+
+def _data_path() -> str:
+    env = os.environ.get("MCTP_SWARM")
+    if env and os.path.exists(env):
+        return env
+    return os.path.join(_HERE, "..", "data", "swarm.jsonl")
+
+
+# built-in fallback when no generated dataset is present
+_BUILTIN = [("swarm/slugify",
+             "Add a function slugify(text): lowercase the text, replace each run of "
+             "non-alphanumeric characters with a single hyphen, and strip leading/trailing "
+             "hyphens.", "slugify",
+             ["assert slugify('Hello World!') == 'hello-world'",
+              "assert slugify('  A..B  ') == 'a-b'",
+              "assert slugify('already-slug') == 'already-slug'"])]
 
 
 class SwarmAdapter:
@@ -75,5 +90,19 @@ class SwarmAdapter:
     default_conditions = ("transcript", "summary", "rag", "mctp")
 
     def tasks(self, limit: int | None = None):
-        tasks = [_slugify_pipeline()]
-        return tasks[:limit] if limit else tasks
+        path = _data_path()
+        specs = []
+        if os.path.exists(path):
+            with open(path) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    r = json.loads(line)
+                    specs.append((r["task_id"], r["brief"], r["spec_name"], r["asserts"]))
+        else:
+            specs = _BUILTIN
+        if limit:
+            specs = specs[:limit]
+        for task_id, brief, fn, asserts in specs:
+            yield _pipeline(task_id, brief, fn, asserts)
