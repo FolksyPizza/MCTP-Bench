@@ -47,7 +47,7 @@ def _write(name: str, rows: list):
 
 def prepare_mbpp(limit):
     from datasets import load_dataset
-    ds = load_dataset("mbpp", split="test")
+    ds = load_dataset("google-research-datasets/mbpp", split="test")
     rows = [{"task_id": r["task_id"], "text": r["text"], "code": r["code"],
              "test_list": r["test_list"], "test_setup_code": r.get("test_setup_code", "")}
             for r in ds]
@@ -56,7 +56,7 @@ def prepare_mbpp(limit):
 
 def prepare_gsm8k(limit):
     from datasets import load_dataset
-    ds = load_dataset("gsm8k", "main", split="test")
+    ds = load_dataset("openai/gsm8k", "main", split="test")
     rows = [{"question": r["question"], "answer": r["answer"]} for r in ds]
     _write("gsm8k", rows[:limit] if limit else rows)
 
