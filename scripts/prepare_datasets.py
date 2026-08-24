@@ -179,14 +179,30 @@ def prepare_repobench(limit):
         if limit and i >= limit:
             break
         target = r.get("file_path", f"target_{i}.py")
-        prefix = (r.get("import_statement", "") + "\n" + r.get("code", "")).strip() + "\n"
+        prefix = (str(r.get("import_statement", "")) + "\n" + str(r.get("code", ""))).strip() + "\n"
         rows.append({
             "task_id": f"repobench/{i}",
-            "files": {target: prefix, "_repo_context.py": r.get("context", "")},
-            "target_file": target, "prefix": prefix,
-            "gold_line": (r.get("next_line", "") or "").strip(),
+            "files": {str(target): prefix, "_repo_context.py": _as_text(r.get("context", ""))},
+            "target_file": str(target), "prefix": prefix,
+            "gold_line": str(r.get("next_line", "") or "").strip(),
         })
     _write("repobench", rows)
+
+
+def _as_text(v) -> str:
+    """Coerce a dataset field to a string: RepoBench's cross-file `context` is a list of snippets
+    (sometimes dicts), not a single string."""
+    if isinstance(v, str):
+        return v
+    if isinstance(v, list):
+        parts = []
+        for c in v:
+            if isinstance(c, dict):
+                parts.append(str(c.get("snippet") or c.get("content") or c.get("text") or c))
+            else:
+                parts.append(str(c))
+        return "\n\n".join(parts)
+    return str(v)
 
 
 PREPARERS = {"mbpp": prepare_mbpp, "gsm8k": prepare_gsm8k, "longbench": prepare_longbench,

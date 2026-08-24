@@ -33,6 +33,7 @@ def source_from_repo(suite: str, task_id: str, task_text: str, repo: dict, tier:
     `mctp` condition) and keep the raw files as a transcript/doc corpus (used by the other
     conditions). `repo` is {path -> content}."""
     from extraction import get_extractor
+    repo = {str(k): (v if isinstance(v, str) else str(v)) for k, v in repo.items()}
     store, tid = get_extractor(extractor, **extractor_kw).extract(repo, task_text, "task_main")
     graph = store.materialize()
     transcript = "\n\n".join(f"--- {p} ---\n{c}" for p, c in repo.items())
