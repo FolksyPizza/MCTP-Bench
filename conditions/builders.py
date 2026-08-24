@@ -54,14 +54,19 @@ def build_rag(source: Source, *, top_k=4, **_) -> Built:
                        "scores": [round(s, 4) for _, s in hits]})
 
 
-def build_mctp(source: Source, **_) -> Built:
+def build_mctp(source: Source, *, budget_tokens=None, **_) -> Built:
     """Core selector packet. Uses a prebuilt graph when the Source carries one; otherwise
-    wraps the bare task as a minimal single-node packet (stateless suites, pre-extractor)."""
+    wraps the bare task as a minimal single-node packet (stateless suites, pre-extractor).
+
+    `budget_tokens` (when set) caps the packet to the receiver's window: the selector drops the
+    least load-bearing, most distant nodes first — an intelligent trim, in contrast to the naive
+    head+tail truncation the transcript baseline gets. Retrievable artifacts stay pullable on
+    demand regardless, so budget-trimming loses reach, not recoverability."""
     if source.graph is not None and source.graph_task_id is not None:
         from mctp import build_packet, cold_start_select
         graph = source.graph
         task_id = source.graph_task_id
-        nodes = cold_start_select(graph, task_id)
+        nodes = cold_start_select(graph, task_id, budget_tokens=budget_tokens)
         text = build_packet(graph, nodes, task_id)
         packet_ids = [n.id for n in nodes]
         retrievable = {n.id: graph.retrieve_artifact(n.id) for n in nodes if n.ref}
@@ -81,7 +86,8 @@ CONDITIONS = {
 }
 
 
-def build(source: Source, condition: str, *, summarizer=None, top_k=4) -> Built:
+def build(source: Source, condition: str, *, summarizer=None, top_k=4, budget_tokens=None) -> Built:
     if condition not in CONDITIONS:
         raise ValueError(f"unknown condition: {condition} (have {sorted(CONDITIONS)})")
-    return CONDITIONS[condition](source, summarizer=summarizer, top_k=top_k)
+    return CONDITIONS[condition](source, summarizer=summarizer, top_k=top_k,
+                                 budget_tokens=budget_tokens)

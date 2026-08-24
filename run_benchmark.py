@@ -64,7 +64,8 @@ def execute_run(store, *, suite, task_id, tier, source, condition, model, trial,
     `max_context_tokens` fits the context to the model window: anything larger is trimmed
     (head+tail) and flagged. A small mctp packet passes through untouched while a long transcript
     is trimmed, and that difference is recorded per run."""
-    built = build(source, condition, summarizer=summarizer)
+    built = build(source, condition, summarizer=summarizer,
+                  budget_tokens=(max_context_tokens or None))
     # When the packet carries artifact references (mctp), tell the receiver it can pull them —
     # the OSS suites' own instructions don't mention the RETRIEVE mechanism, so without this the
     # model never retrieves and the mctp condition is unfairly starved of context.
