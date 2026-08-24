@@ -144,7 +144,7 @@ def _iso(epoch: float) -> str:
     if not epoch:
         return ""
     import datetime
-    return datetime.datetime.utcfromtimestamp(epoch).isoformat() + "Z"
+    return datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).isoformat()
 
 
 def main():
