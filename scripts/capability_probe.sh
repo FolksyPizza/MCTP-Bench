@@ -15,6 +15,7 @@ MODEL="${1:?usage: capability_probe.sh <model> <url> [N] [threshold]}"
 URL="${2:-http://localhost:8000/v1}"
 N="${3:-20}"
 THRESH="${4:-0.40}"
+MAXTOK="${MAXTOK:-1024}"   # raise (e.g. 4096) for reasoning models that spend budget on thinking
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$HERE"
 OUT="/tmp/capprobe_$(echo "$MODEL" | tr '/:' '__')"
@@ -23,7 +24,7 @@ rm -rf "$OUT"
 echo "capability probe: model=$MODEL  N=$N/suite  threshold=$THRESH"
 for suite in humaneval gsm8k; do
   .venv/bin/python run_benchmark.py --suite "$suite" --models "$MODEL" --url "$URL" \
-    --conditions transcript --trials 1 --limit "$N" --max-tokens 1024 --concurrency 6 \
+    --conditions transcript --trials 1 --limit "$N" --max-tokens "$MAXTOK" --concurrency 4 \
     --telemetry-port 0 --results "$OUT" >/dev/null 2>&1 || true
 done
 
