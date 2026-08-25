@@ -8,6 +8,12 @@ data model. The others are deterministic.
 """
 from __future__ import annotations
 
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from mctpbench import tokenizers  # noqa: E402
+
 from .retrieval import TfidfRetriever, chunk
 from .source import Built, Source
 
@@ -58,10 +64,14 @@ def build_mctp(source: Source, *, budget_tokens=None, **_) -> Built:
     """Core selector packet. Uses a prebuilt graph when the Source carries one; otherwise
     wraps the bare task as a minimal single-node packet (stateless suites, pre-extractor).
 
-    `budget_tokens` (when set) caps the packet to the receiver's window: the selector drops the
-    least load-bearing, most distant nodes first — an intelligent trim, in contrast to the naive
-    head+tail truncation the transcript baseline gets. Retrievable artifacts stay pullable on
-    demand regardless, so budget-trimming loses reach, not recoverability."""
+    Hybrid delivery, budget-aware: the selector first drops the least load-bearing, most distant
+    nodes to fit `budget_tokens` (an intelligent trim vs the transcript's naive head+tail). Then,
+    for the selected artifacts, content that FITS the remaining budget is inlined directly (so a
+    document the task genuinely needs is delivered in full, no wasted retrieve round), and only
+    content that would overflow the budget is left as a reference to pull on demand. With no budget
+    every artifact is a reference (the original behavior). The token win therefore comes from
+    excluding irrelevant nodes and deferring overflow — not from starving the receiver of context
+    it needs."""
     if source.graph is not None and source.graph_task_id is not None:
         from mctp import build_packet, cold_start_select
         graph = source.graph
@@ -69,9 +79,22 @@ def build_mctp(source: Source, *, budget_tokens=None, **_) -> Built:
         nodes = cold_start_select(graph, task_id, budget_tokens=budget_tokens)
         text = build_packet(graph, nodes, task_id)
         packet_ids = [n.id for n in nodes]
-        retrievable = {n.id: graph.retrieve_artifact(n.id) for n in nodes if n.ref}
+        retrievable, inlined = {}, []
+        used = tokenizers.count(text, tokenizers.default())
+        for n in nodes:
+            if not n.ref:
+                continue
+            content = graph.retrieve_artifact(n.id)
+            ctoks = tokenizers.count(content, tokenizers.default())
+            if budget_tokens and used + ctoks <= budget_tokens:
+                text += f"\n\n[ARTIFACT {n.id} — {n.ref.get('path', '')}]\n{content}"
+                used += ctoks
+                inlined.append(n.id)
+            else:
+                retrievable[n.id] = content   # overflow: pull on demand
         return Built(condition="mctp", text=text, retrievable=retrievable,
-                     packet_node_ids=packet_ids)
+                     packet_node_ids=packet_ids,
+                     meta={"inlined": inlined, "referenced": list(retrievable)})
     # No graph: the packet is just the task as current state. Honest for stateless tasks.
     text = f"STATE\n- task: {source.task}"
     return Built(condition="mctp", text=text, packet_node_ids=[source.task_id],
