@@ -37,7 +37,8 @@ Legend: ✅ passes the gate · ⚠️ passes but weak on some tasks · ❌ unsui
 | Model | Family | Size | Served | Gate (HumanEval / GSM8K) | Status |
 |-------|--------|------|--------|--------------------------|--------|
 | **Qwen3-32B-AWQ** | Qwen3 | 32B | **vLLM** | **97% (14/15, 15/15)** | ✅ **results tier (vLLM-confirmed)** |
-| Gemma 3 27B | Gemma | 27B | Ollama (vLLM pending) | 92% (12/12, 10/12) | ✅ results candidate — 2nd family |
+| **Qwen2.5-Coder-32B-AWQ** | Qwen2.5 | 32B | **vLLM** | **93% (14/15, 14/15)** | ✅ **results tier — code** |
+| Gemma 3 27B | Gemma | 27B | Ollama only | 92% (12/12, 10/12) | ⛔ vLLM blocked: HF-gated, no host token |
 | Qwen3 35B (qwen3:35b build) | Qwen3 | 35B | Ollama | 75% (6/12, 12/12) | ⚠️ passes; weaker on code than the 27B |
 | gpt-oss 20B | GPT-OSS | 20B | Ollama | errored (HTTP 500) | ❌ unsuitable on this build |
 | Qwen2.5-14B-Instruct | Qwen2.5 | 14B | vLLM | HumanEval 4/5 (spot) | ✅ telemetry tier |
@@ -59,5 +60,12 @@ Recent, capable OSS models targeted for the results tier, pending an empirical p
 - gemma-3-27b-it (AWQ) — confirm the Gemma result on vLLM.
 - Mistral-Small-24B-Instruct (AWQ) — a fourth family.
 - A reasoning model (QwQ-32B / DeepSeek-R1-Distill-Qwen-32B) for the reasoning slot.
+
+## Access note
+
+The host has no Hugging Face token, so **HF-gated models (Gemma, Mistral, Llama) cannot be served
+on vLLM** without one. Options: (a) add an HF token on the host to unlock those families, or (b) use
+open-access families for cross-model breadth — Qwen3, Qwen2.5-Coder, Phi (microsoft/phi-4),
+Yi (01-ai/Yi-1.5-34B), InternLM, and DeepSeek-R1-Distill (reasoning) — none of which are gated.
 
 This table is updated as models are gated.
