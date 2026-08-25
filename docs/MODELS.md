@@ -24,7 +24,7 @@ which is the system of record.
 
 ## Model tiers
 
-- Telemetry and development tier (about 14B): fast, large-scale plumbing and throughput runs. Not
+- Telemetry and development tier (about 14B): fast, large-scale pipeline and throughput runs. Not
   used for final results.
 - Results tier (20 to 35B, capability-gated): the models final results are reported on. The suite
   spans several model families for cross-model evidence and includes a reasoning model.
@@ -38,7 +38,7 @@ which is the system of record.
 | Phi-4 | Phi | 14B | vLLM | 93% (14/15, 14/15) | Passes; strong for size |
 | Gemma 3 27B | Gemma | 27B | single-stream | 92% (12/12, 10/12) | Candidate; vLLM re-gate pending |
 | Qwen3 35B | Qwen3 | 35B | single-stream | 75% (6/12, 12/12) | Passes; weaker on code than the 27B |
-| Qwen2.5-14B-Instruct | Qwen2.5 | 14B | vLLM | HumanEval 4/5 (spot) | Telemetry tier |
+| Qwen2.5-14B-Instruct | Qwen2.5 | 14B | vLLM | HumanEval 4/5 (sample) | Telemetry tier |
 | GPT-OSS 20B | GPT-OSS | 20B | single-stream | server errors | Unsuitable in this environment |
 | Qwen2.5-Coder-7B | Qwen2.5 | 7B | vLLM | near-zero on hard tasks | Below the results floor |
 

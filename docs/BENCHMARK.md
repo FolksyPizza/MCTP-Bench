@@ -21,17 +21,17 @@ scenarios over broad, shallow coverage.
 
 Every scenario is evaluated under at least two conditions:
 
-- `flat`, the raw Agent-A transcript (all content inline, stale material included).
-- `mctp`, the Core selector packet (explicit state + artifact references) with
+- `flat`: the raw Agent-A transcript (all content inline, stale material included).
+- `mctp`: the Core selector packet (explicit state + artifact references) with
  retrieve-on-demand.
 
 Two further baselines are planned so MCTP is compared against strong alternatives rather than
 only a raw dump:
 
-- `summary`, the same model as the receiver condenses Agent A's context into a handoff (an agent
+- `summary`: the same model as the receiver condenses Agent A's context into a handoff (an agent
  summarizing its own state); the summarizer's inference cost is counted in the total, not just
  the summary's token size.
-- `rag`, the same source is stored and fetched with conventional vector retrieval.
+- `rag`: the same source is stored and fetched with conventional vector retrieval.
 
 Total cost for every condition is accounted the same way: Agent A inference + any preparation
 inference (e.g. summarization) + retrieval/infrastructure + Agent B inference.
@@ -211,7 +211,7 @@ python analyze.py # pricing + aggregate tables
 
 # a fast first run (one small model, low-context suites, a few tasks each):
 bash scripts/smoke.sh <model-id> http://localhost:8000/v1
-# broadest coverage, one task from EVERY suite/category, all conditions:
+# broadest coverage, one task from every suite/category, all conditions:
 bash scripts/smoke.sh <model-id> http://localhost:8000/v1 all
 ```
 

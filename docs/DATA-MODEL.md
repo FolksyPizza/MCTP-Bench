@@ -1,8 +1,8 @@
 # MCTP-Bench Data Model
 
 What every benchmark run records, how it is stored, and how it is scored. The goal is to preserve
-everything, full model output, chain-of-thought, token counts, second-by-second timing, and
-scores, so analysis and pricing can be redone later without re-running any model.
+everything (full model output, chain-of-thought, token counts, second-by-second timing, and
+scores) so that analysis and pricing can be redone later without re-running any model.
 
 ## Principles
 
@@ -78,7 +78,7 @@ without re-running any model.
 ## Tokenization
 
 Token counts are recorded two ways. The model's native counts come from the server's `usage`
-field, the model's own tokenizer, and are authoritative for that model's cost; on the GPU host
+field (the model's own tokenizer) and are authoritative for that model's cost; on the GPU host
 the model's Hugging Face tokenizer is available and is used when the server does not report usage.
 In addition, reference counts are computed over the same text with a fixed set of tokenizers
 (the tiktoken encodings and selected model tokenizers) so token amounts are comparable across
@@ -135,12 +135,12 @@ All receiver runs are recorded first; scoring is a separate pass that never re-r
 The pass (`scoring/judge.py`) has three stages and stores every judge input/output, so the
 scoring itself is auditable and can be re-aggregated:
 
-1. Independent scoring, an ensemble of at least three judge models, chosen from different
+1. Independent scoring: an ensemble of at least three judge models, chosen from different
  families to reduce self-preference bias, each scores every output `samples_per_judge` times
  (two by default) at nonzero temperature. The two samples expose a judge's own instability.
-2. Cross-review, each judge is then shown the other judges' assessments and asked to critique
+2. Cross-review: each judge is then shown the other judges' assessments and asked to critique
  them and give a final judgment, so an outlier can be corrected and disagreement is surfaced.
-3. Aggregation, the final label is the majority vote over the post-review pass/fail and the
+3. Aggregation: the final label is the majority vote over the post-review pass/fail and the
  median of the post-review scores. Inter-judge disagreement, sample instability, and the
  round-1 to round-2 score shift are recorded alongside.
 
@@ -169,15 +169,15 @@ condition and embedding/retrieval for `rag`, priced per model.
 
 The run store and streaming runner are implemented:
 
-- `mctpbench/streaming.py`, `StreamingRunner` runs a model over the OpenAI-compatible endpoint
+- `mctpbench/streaming.py`: `StreamingRunner` runs a model over the OpenAI-compatible endpoint
  with `stream=true`, capturing the exact request(s), every streamed chunk with its wall-clock
  offset, the server's `usage` block (native token counts), and the assembled answer/reasoning.
  It populates `timeline_ref`, `ttft_s`, and per-token timing, and handles the retrieve-on-demand
  rounds.
-- `mctpbench/records.py`, `RunRecord` (the schema above) and `ResultStore`, which writes the raw
+- `mctpbench/records.py`: `RunRecord` (the schema above) and `ResultStore`, which writes the raw
  capture, the referenced text under `outputs/`, the reference token counts, and the parsed record
  into the storage tree.
-- `run_benchmark.py`, the matrix runner (suite x models x conditions x trials) that assembles and
+- `run_benchmark.py`: the matrix runner (suite x models x conditions x trials) that assembles and
  writes each record; `--dry-run` exercises the whole pipeline with a deterministic runner and no
  server. `analyze.py` applies pricing and writes the committed aggregates.
 

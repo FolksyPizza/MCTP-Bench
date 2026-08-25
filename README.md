@@ -68,7 +68,7 @@ full raw + parsed data per run; see [docs/BENCHMARK.md](docs/BENCHMARK.md) and
 
 ## Conditions
 
-- `flat`, raw Agent-A transcript (everything inline, stale content included).
+- `flat`: raw Agent-A transcript (everything inline, stale content included).
 - `mctp`, Core cold-start selector packet plus a retrieve-on-demand blob map.
 
 ## Metrics
