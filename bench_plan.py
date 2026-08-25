@@ -60,15 +60,20 @@ SUITES = [
           objective=False),
 ]
 
-# A suite of different models per wave, spanning families (Qwen, Llama, Gemma) so results are not
-# tied to one lineage. Each wave includes a reasoning model (marked *). The large wave's 32B
-# models need AWQ/GPTQ quantization to fit 2x24GB via tensor-parallel.
+# Model suite: recent, capable OSS models in the 14-32B range that EMPIRICALLY clear the capability
+# gate (scripts/capability_probe.sh) — chosen because they actually perform here, not because they
+# are claimed to. Below ~14B most models fail too many tasks to distinguish conditions. Served at a
+# lower context window (32K native, no rope scaling) — faster, fits comfortably, and covers the
+# vast majority of tasks; the rare longer task is trimmed (recorded). The large wave's 32B models
+# use AWQ to fit 2x24GB, 1-2 loaded at a time. Names are placeholders pending the gate; each wave
+# spans families (Qwen, Gemma, ...) and includes a reasoning model (marked *).
 WAVES = [
-    Wave("small", [("qwen2.5-coder:7b", False), ("qwen2.5-coder:14b", False),
-                   ("llama3.1:8b", False), ("gemma2:9b", False), ("qwen3:8b", True)]),
-    Wave("large", [("gemma3:27b", False), ("qwen2.5:32b-awq", False),
-                   ("qwen2.5-coder:32b-awq", False), ("qwen3:32b-awq", True)]),
+    Wave("capable", [("qwen2.5-14b", False), ("qwen2.5-coder-14b", False),
+                     ("gemma2-9b", False), ("qwen3-14b", True)]),
+    Wave("large", [("qwen2.5-32b-awq", False), ("qwen2.5-coder-32b-awq", False),
+                   ("gemma3-27b", False), ("qwq-32b-awq", True)]),
 ]
+CONTEXT_WINDOW = 32768   # served context per model (lower context, higher capability + speed)
 
 # Model policy: a single-agent test (every suite except the multi-agent `swarm`) must run on at
 # least this many distinct models, so any MCTP effect is shown to hold across models and is not a
@@ -87,7 +92,7 @@ ARRANGEMENTS_TOTAL = sum(_ARR.values())
 # capability at high context), served 1-2 at a time at a 64-128K window. The multi-agent swarm
 # tier uses the small-model wave only (cheap workers across roles), so swarm's arrangements come
 # from the small wave alone.
-SWARM_WAVE = "small"
+SWARM_WAVE = "capable"
 
 
 def _multiplier(suite: Suite, n_models: int, wave: str | None) -> int:
@@ -141,8 +146,9 @@ def print_plan():
     print(f"  single-agent suites run on all {total_models} models across both waves "
           f"(>= {MIN_MODELS_SINGLE_AGENT} required, so an MCTP effect is cross-model, not a "
           f"single-model artifact)")
-    print("  large models (27-35B, AWQ) are used ONLY for single-agent suites, served 1-2 at a "
-          "time at a 64-128K window")
+    print(f"  models are capability-gated (scripts/capability_probe.sh) and served at a "
+          f"{CONTEXT_WINDOW // 1024}K window; large 32B (AWQ) models run single-agent suites only, "
+          f"1-2 loaded at a time")
     print(f"  the multi-agent `swarm` suite uses the small-model wave only "
           f"({_ARR[SWARM_WAVE]} arrangements) — cheap workers across roles")
     small_ok = len(WAVES[0].models) >= MIN_MODELS_SINGLE_AGENT
