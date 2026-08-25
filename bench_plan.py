@@ -83,11 +83,18 @@ _ARR = {w.name: len(build_arrangements([m for m, _ in w.models])) for w in WAVES
 ARRANGEMENTS_TOTAL = sum(_ARR.values())
 
 
+# Policy: large models are used only for single-agent suites (their strength is per-agent
+# capability at high context), served 1-2 at a time at a 64-128K window. The multi-agent swarm
+# tier uses the small-model wave only (cheap workers across roles), so swarm's arrangements come
+# from the small wave alone.
+SWARM_WAVE = "small"
+
+
 def _multiplier(suite: Suite, n_models: int, wave: str | None) -> int:
-    """The model dimension: for swarm it is the number of agent arrangements, otherwise the model
-    count. `wave` selects a single wave's arrangements; None means both waves combined."""
+    """The model dimension: for swarm it is the number of agent arrangements (small wave only),
+    otherwise the model count. `wave` selects a single wave's arrangements; None means both."""
     if suite.name == "swarm":
-        return _ARR[wave] if wave else ARRANGEMENTS_TOTAL
+        return _ARR[SWARM_WAVE]
     return n_models
 
 
@@ -131,10 +138,13 @@ def print_plan():
     print("  * = reasoning model")
 
     print("\nMODEL POLICY")
-    print(f"  single-agent suites run on all {total_models} models across the two waves "
+    print(f"  single-agent suites run on all {total_models} models across both waves "
           f"(>= {MIN_MODELS_SINGLE_AGENT} required, so an MCTP effect is cross-model, not a "
           f"single-model artifact)")
-    print("  the multi-agent `swarm` suite is exempt (it already spans multiple agent roles)")
+    print("  large models (27-35B, AWQ) are used ONLY for single-agent suites, served 1-2 at a "
+          "time at a 64-128K window")
+    print(f"  the multi-agent `swarm` suite uses the small-model wave only "
+          f"({_ARR[SWARM_WAVE]} arrangements) — cheap workers across roles")
     small_ok = len(WAVES[0].models) >= MIN_MODELS_SINGLE_AGENT
     print(f"  smallest wave has {len(WAVES[0].models)} models: "
           f"{'satisfies' if small_ok else 'VIOLATES'} the >= {MIN_MODELS_SINGLE_AGENT} rule")

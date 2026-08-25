@@ -88,6 +88,10 @@ def aggregate(runs: list, judge: dict, pricing: dict) -> list:
             "objective_pass_rate": (sum(obj) / len(obj)) if obj else None,
             "judge_pass_rate": (sum(jud) / len(jud)) if jud else None,
             "avg_context_tokens": round(_avg(r["context_tokens"] for r in recs), 1),
+            "avg_context_original": round(_avg(
+                r.get("context_tokens_original") or r["context_tokens"] for r in recs), 1),
+            "truncation_rate": round(_avg(
+                1.0 if r.get("context_truncated") else 0.0 for r in recs), 3),
             "avg_output_tokens": round(_avg(
                 (r.get("output_tokens") or 0) + (r.get("reasoning_tokens") or 0)
                 for r in recs), 1),
@@ -99,7 +103,8 @@ def aggregate(runs: list, judge: dict, pricing: dict) -> list:
 
 def _table(rows: list) -> str:
     cols = ["suite", "model", "condition", "n", "objective_pass_rate", "judge_pass_rate",
-            "avg_context_tokens", "avg_output_tokens", "avg_latency_s", "avg_cost_usd"]
+            "avg_context_tokens", "avg_context_original", "truncation_rate",
+            "avg_output_tokens", "avg_latency_s", "avg_cost_usd"]
     head = "| " + " | ".join(cols) + " |"
     sep = "| " + " | ".join("---" for _ in cols) + " |"
     lines = [head, sep]
