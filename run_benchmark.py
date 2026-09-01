@@ -287,7 +287,11 @@ def main():
     if args.stop_ollama and not args.dry_run:
         _stop_ollama_models()
 
-    manifest = Manifest(os.path.join(args.results, "progress", f"{args.suite}.log"))
+    # Key the manifest by model as well as suite, so several workers (e.g. one per GPU,
+    # each serving a different model) can share a single results store without their
+    # resume logs colliding. Run records are already sharded by runs/<suite>/<model>/.
+    _mtag = "__".join(m.replace("/", "-").replace(":", "-").replace("@", "-") for m in models) or "all"
+    manifest = Manifest(os.path.join(args.results, "progress", f"{args.suite}__{_mtag}.log"))
     gate = WindowGate(args.window)
     jobs = [(m, task, c, tr) for m in model_units for task in tasks for c in conditions
             for tr in range(1, args.trials + 1)]

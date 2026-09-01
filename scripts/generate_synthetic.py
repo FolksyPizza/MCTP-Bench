@@ -80,39 +80,57 @@ def gen_multifile(n):
     return rows
 
 
-# --- swarm templates: each returns a pipeline spec (brief + stages) ----------------------------
-# The engineer stage carries an objective check embedded as asserts the runner executes.
+# --- swarm templates: multi-agent pipelines with a carried design decision ---------------------
+# Each spec establishes a "carry" decision at the first stage (the architect) that is NOT restated
+# later and is only checked at the final stage (the engineer). Distractor stages pad the pipeline
+# to a target depth, so the decision must survive every handoff. This is the multi-agent test:
+# transcript keeps the decision but at growing token cost, summary tends to drop the specific
+# detail, and MCTP carries it as a compact decision node. The base briefs are deliberately generic
+# (they do not contain the carried decision), so only the threaded state can supply it.
 
-def _swarm_task(i, name, brief, spec, asserts):
-    return {"task_id": f"swarm/gen-{i}-{name}", "brief": brief, "spec_name": spec,
-            "asserts": asserts, "synthetic": True}
+_SWARM_DEPTHS = (3, 5, 8)
 
 
+def _swarm_task(i, name, fn, brief, carry, asserts, depth):
+    return {"task_id": f"swarm/gen-{i}-{name}-d{depth}", "brief": brief, "spec_name": fn,
+            "carry": carry, "depth": depth, "asserts": asserts, "synthetic": True}
+
+
+# (name, fn, generic brief, carried decision, asserts that encode the decision)
 _SWARM_SPECS = [
-    ("slugify", "Add slugify(text): lowercase, replace non-alphanumeric runs with a single "
-     "hyphen, strip leading/trailing hyphens.",
-     ["assert slugify('Hello World!') == 'hello-world'",
-      "assert slugify('  A..B  ') == 'a-b'",
-      "assert slugify('already-slug') == 'already-slug'"]),
-    ("chunk", "Add chunk(items, size): split a list into consecutive sublists of length size "
-     "(the last may be shorter).",
-     ["assert chunk([1,2,3,4,5], 2) == [[1,2],[3,4],[5]]",
-      "assert chunk([], 3) == []",
-      "assert chunk([1], 5) == [[1]]"]),
-    ("dedupe", "Add dedupe(items): return items with duplicates removed, preserving first-seen "
-     "order.",
-     ["assert dedupe([3,1,3,2,1]) == [3,1,2]",
-      "assert dedupe([]) == []",
-      "assert dedupe(['a','a','b']) == ['a','b']"]),
+    ("slugify", "slugify",
+     "Add a function slugify(text) that lowercases the text, replaces each run of "
+     "non-alphanumeric characters with a single separator, and strips leading and trailing "
+     "separators.",
+     "the separator character must be '_' (underscore), never a hyphen",
+     ["assert slugify('Hello World!') == 'hello_world'",
+      "assert slugify('  A..B  ') == 'a_b'",
+      "assert slugify('already_slug') == 'already_slug'"]),
+    ("chunk", "chunk",
+     "Add a function chunk(items, size) that splits a list into consecutive sublists of "
+     "length size.",
+     "the final short sublist must be padded with the fill value 0 up to length size",
+     ["assert chunk([1,2,3], 2) == [[1,2],[3,0]]",
+      "assert chunk([1,2,3,4], 2) == [[1,2],[3,4]]",
+      "assert chunk([1], 3) == [[1,0,0]]"]),
+    ("dedupe", "dedupe",
+     "Add a function dedupe(items) that removes duplicate values from a list.",
+     "on a duplicate, keep the last occurrence and return items in last-seen order",
+     ["assert dedupe([3,1,3,2,1]) == [3,2,1]",
+      "assert dedupe(['a','a','b']) == ['a','b']",
+      "assert dedupe([1,1,1]) == [1]"]),
 ]
 
 
 def gen_swarm(n):
+    combos = [(spec, d) for spec in _SWARM_SPECS for d in _SWARM_DEPTHS]
+    per = max(1, n // len(combos))
     rows = []
-    for i in range(n):
-        name, brief, asserts = _SWARM_SPECS[i % len(_SWARM_SPECS)]
-        fn = name
-        rows.append(_swarm_task(i, name, brief, fn, asserts))
+    k = 0
+    for (name, fn, brief, carry, asserts), depth in combos:
+        for _ in range(per):
+            rows.append(_swarm_task(k, name, fn, brief, carry, asserts, depth))
+            k += 1
     return rows
 
 

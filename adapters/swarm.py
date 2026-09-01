@@ -47,24 +47,46 @@ def _asserts_objective(fn: str, asserts: list):
     return score
 
 
-def _pipeline(task_id: str, brief: str, fn: str, asserts: list) -> SwarmTask:
-    """A research -> implementation -> testing pipeline for one small utility spec."""
-    return SwarmTask(
-        task_id=task_id, brief=brief,
-        stages=[
-            Stage("researcher",
-                  f"Specify the exact behavior of {fn}, including edge cases (empty input, "
-                  f"boundary sizes, already-satisfying input).",
-                  "List the required behavior and edge cases as concise bullet points."),
-            Stage("engineer",
-                  f"Implement {fn} in Python according to the specification.",
-                  "Write the complete function inside a single ```python code block. No prose.",
-                  objective=_asserts_objective(fn, asserts)),
-            Stage("tester",
-                  f"Write unit tests for {fn} that cover the specified edge cases.",
-                  "Write the tests as Python assert statements inside a ```python code block."),
-        ],
-    )
+# Distractor handoffs that pad a pipeline to its target depth. They do real (if generic) work
+# and deliberately do NOT restate the carried design decision, so the decision must survive the
+# pipeline through the threaded state alone.
+_DISTRACTORS = [
+    ("reviewer", "Review the overall approach for {fn} for general code quality.",
+     "Give a short bulleted review. Do not restate any specific numeric or formatting decisions."),
+    ("documenter", "Draft a one-paragraph module docstring describing what {fn} is for.",
+     "Write a single concise paragraph."),
+    ("planner", "Outline a high-level testing plan for {fn}.",
+     "List the test categories as brief bullet points."),
+    ("risk", "Identify the main risks or failure modes when building {fn}.",
+     "List the risks as brief bullet points."),
+    ("perf", "Comment on the performance characteristics expected of {fn}.",
+     "Write one short paragraph."),
+    ("integrator", "Describe how {fn} fits into a larger utilities module.",
+     "Write one short paragraph."),
+]
+
+
+def _pipeline(task_id: str, brief: str, fn: str, asserts: list, carry: str = "",
+              depth: int = 3) -> SwarmTask:
+    """A depth-`depth` pipeline. The architect establishes a carried design decision, distractor
+    stages pad the depth without restating it, and the final engineer must honor the decision it
+    can only have learned through the threaded state. This is the multi-agent test: the earlier a
+    decision is set and the more handoffs it must survive, the more the delivery method matters."""
+    stages = [
+        Stage("architect",
+              f"Establish the mandatory design decision for {fn}.",
+              f"Output exactly one line and nothing else: DESIGN DECISION: {carry}."),
+    ]
+    for j in range(max(1, depth - 2)):
+        role, instr, recv = _DISTRACTORS[j % len(_DISTRACTORS)]
+        stages.append(Stage(role, instr.format(fn=fn), recv.format(fn=fn)))
+    stages.append(Stage(
+        "engineer",
+        f"Implement {fn} in Python. You must honor every DESIGN DECISION established earlier in "
+        f"this project, even if it is not repeated here.",
+        "Write the complete function inside a single ```python code block. No prose.",
+        objective=_asserts_objective(fn, asserts)))
+    return SwarmTask(task_id=task_id, brief=brief, stages=stages)
 
 
 def _data_path() -> str:
@@ -76,12 +98,13 @@ def _data_path() -> str:
 
 # built-in fallback when no generated dataset is present
 _BUILTIN = [("swarm/slugify",
-             "Add a function slugify(text): lowercase the text, replace each run of "
-             "non-alphanumeric characters with a single hyphen, and strip leading/trailing "
-             "hyphens.", "slugify",
-             ["assert slugify('Hello World!') == 'hello-world'",
-              "assert slugify('  A..B  ') == 'a-b'",
-              "assert slugify('already-slug') == 'already-slug'"])]
+             "Add a function slugify(text) that lowercases the text, replaces each run of "
+             "non-alphanumeric characters with a single separator, and strips leading and "
+             "trailing separators.", "slugify",
+             ["assert slugify('Hello World!') == 'hello_world'",
+              "assert slugify('  A..B  ') == 'a_b'",
+              "assert slugify('already_slug') == 'already_slug'"],
+             "the separator character must be '_' (underscore), never a hyphen", 3)]
 
 
 class SwarmAdapter:
@@ -99,10 +122,11 @@ class SwarmAdapter:
                     if not line:
                         continue
                     r = json.loads(line)
-                    specs.append((r["task_id"], r["brief"], r["spec_name"], r["asserts"]))
+                    specs.append((r["task_id"], r["brief"], r["spec_name"], r["asserts"],
+                                  r.get("carry", ""), r.get("depth", 3)))
         else:
             specs = _BUILTIN
         if limit:
             specs = specs[:limit]
-        for task_id, brief, fn, asserts in specs:
-            yield _pipeline(task_id, brief, fn, asserts)
+        for task_id, brief, fn, asserts, carry, depth in specs:
+            yield _pipeline(task_id, brief, fn, asserts, carry, depth)
