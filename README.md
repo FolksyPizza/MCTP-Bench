@@ -94,6 +94,9 @@ already-concise ones. Per-scenario descriptions and numbers are in
 [docs/SCENARIOS.md](docs/SCENARIOS.md); the full results table and methodology are in the
 [experiment record](https://github.com/FolksyPizza/MCTP/blob/main/docs/EXPERIMENTS.md).
 
+Large-scale results for a capable open-weights model across the standard suites are in
+[docs/RESULTS.md](docs/RESULTS.md). These are interim and updated as the run completes.
+
 ## Limitations
 
 - `MockRunner` is deterministic and model-free; it validates the harness, not efficacy.
