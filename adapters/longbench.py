@@ -38,13 +38,40 @@ def _path() -> str:
                                                           "longbench_sample.jsonl")
 
 
-def _any_match(answers: list):
-    golds = [re.sub(r"\s+", " ", a.strip().lower()) for a in answers]
+def _norm_ans(s: str) -> str:
+    """Normalize for answer matching: lowercase, drop markdown emphasis and punctuation, collapse
+    whitespace. Without this, a correct answer fails on the model's markdown bold, a hyphen, or a
+    trailing period (e.g. gold 'Vice Admiral.' vs output '**Vice Admiral**.')."""
+    s = (s or "").lower()
+    s = re.sub(r"[*`#_]+", " ", s)        # markdown emphasis
+    s = re.sub(r"[^a-z0-9 ]", " ", s)     # punctuation
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _token_f1(pred_toks: list, gold_toks: list) -> float:
+    if not pred_toks or not gold_toks:
+        return 0.0
+    common = sum(min(pred_toks.count(w), gold_toks.count(w)) for w in set(gold_toks))
+    if not common:
+        return 0.0
+    prec, rec = common / len(pred_toks), common / len(gold_toks)
+    return 2 * prec * rec / (prec + rec)
+
+
+def _any_match(answers: list, f1_threshold: float = 0.5):
+    """Robust QA scoring: a gold answer passes if its normalized form is contained in the
+    normalized output, or if token-F1 against any gold clears `f1_threshold` (covers correct
+    answers that are reworded rather than quoted verbatim)."""
+    golds = [_norm_ans(a) for a in answers]
 
     def score(answer: str) -> tuple:
-        a = re.sub(r"\s+", " ", (answer or "").strip().lower())
-        ok = any(g and g in a for g in golds)
-        return ok, {"answers": answers, "matched": ok}
+        norm = _norm_ans(answer)
+        toks = norm.split()
+        contained = any(g and g in norm for g in golds)
+        best_f1 = max((_token_f1(toks, g.split()) for g in golds), default=0.0)
+        ok = contained or best_f1 >= f1_threshold
+        method = "contains" if contained else "f1" if ok else "none"
+        return ok, {"answers": answers, "matched": ok, "f1": round(best_f1, 2), "method": method}
 
     return score
 

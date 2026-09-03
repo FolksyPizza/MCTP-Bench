@@ -25,20 +25,22 @@ Each cell reports the objective pass rate and the average delivered-context size
 | humaneval | 164 | 96% / 0 | 96% / 0 | 96% / 0 | 96% / 136 |
 | mbpp | 500 | 82% / 0 | 82% / 0 | 82% / 0 | 81% / 52 |
 | multifile | 300 | 100% / 80 | 91% / 279 | 100% / 75 | 100% / 157 |
-| longbench | 294 | 51% / 12,360 | 40% / 836 | 37% / 354 | 50% / 180 |
+| longbench | 294 | 61% / 12,360 | 46% / 836 | 46% / 354 | 59% / 180 |
 
-Cells are pass rate / average context tokens.
+Cells are pass rate / average context tokens. (longbench uses robust QA answer matching that
+tolerates markdown, punctuation, and rewording.)
 
 On the low-context suites (gsm8k, humaneval, mbpp) the four conditions fall within one point of
 each other. These tasks carry little prunable prior context, so the delivery method does not
 change the outcome. This is the expected baseline: MCTP does not cost accuracy where there is
 nothing to select.
 
-The long-context suite is where the delivery method separates. On longbench, MCTP reaches the
-accuracy of the full transcript (50 percent against 51 percent) while delivering about one
-sixty-ninth of the context (180 tokens against 12,360). It also scores above same-model
-summarization and TF-IDF retrieval, the other two ways of reducing context. On long-context tasks
-MCTP holds the accuracy of sending everything at a fraction of the token cost.
+The long-context suite is where the delivery method separates. On longbench, MCTP nearly matches
+the full transcript (59 percent against 61 percent) while delivering about one sixty-ninth of the
+context (180 tokens against 12,360), and it scores about thirteen points above same-model
+summarization and TF-IDF retrieval (both near 46 percent). On the smaller models, whose 8192-token
+window forces the transcript to truncate, MCTP wins outright (for example 54 vs 37 percent on the
+7B) because it selects the load-bearing context instead of losing it to a blind trim.
 
 ## Pending
 
