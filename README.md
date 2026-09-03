@@ -68,34 +68,28 @@ full raw + parsed data per run; see [docs/BENCHMARK.md](docs/BENCHMARK.md) and
 
 ## Conditions
 
-- `flat`: raw Agent-A transcript (everything inline, stale content included).
-- `mctp`, Core cold-start selector packet plus a retrieve-on-demand blob map.
+Four handoff strategies compared head to head, plus an experimental fifth:
+
+- `transcript`: the full accumulated context inline (stale content included).
+- `summary`: a same-model summarization of that context (its inference cost is counted).
+- `rag`: TF-IDF retrieval over that context.
+- `mctp`: the Core believed-state packet, selected to a token budget, with retrieve-on-demand.
+- `mctp-r`: MCTP with relevance-ranked selection (retrieval inside the believed-state packet).
 
 ## Metrics
 
-Accuracy (pass rate and gold sub-criteria), efficiency (context, retrieved, and total
-tokens), behavior (pulls and codebase reads), and the MISLEADING count (whether provided
-content caused an incorrect claim). A retrieve-on-demand pull is expected behavior; a
-codebase read is a severe miss.
+Accuracy (objective pass rate and gold sub-criteria), efficiency (context, retrieved, and total
+tokens), latency and decode speed, and behavior (retrieve-on-demand pulls and codebase reads).
+A pull is expected behavior; a codebase read is a severe miss. Every run keeps a full audit
+trail: the exact prompt, the output, the per-token timeline, and the raw request and response.
 
 ## Results
 
-Single trial per condition, all runs using Claude models, task success judged by keyword-based
-checks. Token counts use the tiktoken `o200k_base` encoding (see `results/token_comparison.md`
-for other tokenizers). These are preliminary and are not a statistical evaluation.
-
-Across ten scenarios (20 conditions): the `flat` baseline passed all ten; the `mctp` condition
-passed nine and failed one (`hidden_constraint`, where the packet omitted a required constraint
-that was present in the transcript but not linked to the task). No misleading answers. On cost,
-MCTP reduced total tokens in eight of ten scenarios and increased them in two; the effect scales
-with how prunable the context is, from `outage_investigation` (-67%) and `payment_idempotency`
-(-72%) on large, noisy transcripts to `auth_migration` (+50%) and `flaky_test` (+4%) on small,
-already-concise ones. Per-scenario descriptions and numbers are in
-[docs/SCENARIOS.md](docs/SCENARIOS.md); the full results table and methodology are in the
-[experiment record](https://github.com/FolksyPizza/MCTP/blob/main/docs/EXPERIMENTS.md).
-
-Large-scale results for a capable open-weights model across the standard suites are in
-[docs/RESULTS.md](docs/RESULTS.md). These are interim and updated as the run completes.
+Each suite runs under the conditions above on local open-weights models. The strongest results
+are on long-context and multi-agent handoffs, where an explicit, provenance-tracked believed-state
+holds up as work passes from one agent to the next in ways that a summary or plain retrieval
+cannot. Interim results for a capable open-weights model across the completed suites, pairing pass
+rate with context cost, are in [docs/RESULTS.md](docs/RESULTS.md), updated as the run completes.
 
 ## Limitations
 
