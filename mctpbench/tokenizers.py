@@ -20,7 +20,7 @@ import os
 HEURISTIC = "heuristic"
 _TIKTOKEN_ENCODINGS = ("gpt2", "cl100k_base", "o200k_base")
 # Open-model tokenizers to include as reference counts, when transformers + the tokenizer files
-# are available. Override with MCTP_HF_TOKENIZERS (comma-separated model ids). These make token
+# are available. Override with ASTP_HF_TOKENIZERS (comma-separated model ids). These make token
 # amounts comparable under the families actually being run (Qwen, Llama, ...), not only OpenAI's.
 _DEFAULT_HF = ("Qwen/Qwen2.5-7B", "meta-llama/Llama-3.1-8B")
 
@@ -42,14 +42,14 @@ def _hf(model: str):
 
 
 def _configured_hf() -> list:
-    """`hf:<model>` names from MCTP_HF_TOKENIZERS, or the defaults, if transformers is importable.
+    """`hf:<model>` names from ASTP_HF_TOKENIZERS, or the defaults, if transformers is importable.
     Names are listed optimistically; a model whose files are absent fails lazily at count time and
     is skipped there (see records.ref_token_counts)."""
     try:
         import transformers  # noqa: F401
     except Exception:
         return []
-    env = os.environ.get("MCTP_HF_TOKENIZERS")
+    env = os.environ.get("ASTP_HF_TOKENIZERS")
     models = [m.strip() for m in env.split(",")] if env else list(_DEFAULT_HF)
     return [f"hf:{m}" for m in models if m]
 
@@ -67,11 +67,11 @@ def available() -> list:
 
 
 def reference_set() -> list:
-    """Tokenizers used for per-run reference counts. Configurable with MCTP_REF_TOKENIZERS (an
-    explicit comma-separated list, overriding everything) or MCTP_HF_TOKENIZERS (open-model
+    """Tokenizers used for per-run reference counts. Configurable with ASTP_REF_TOKENIZERS (an
+    explicit comma-separated list, overriding everything) or ASTP_HF_TOKENIZERS (open-model
     tokenizers added to the tiktoken encodings). Falls back to the heuristic if nothing else is
     available."""
-    env = os.environ.get("MCTP_REF_TOKENIZERS")
+    env = os.environ.get("ASTP_REF_TOKENIZERS")
     if env:
         return [t.strip() for t in env.split(",") if t.strip()]
     out = []

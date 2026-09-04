@@ -1,4 +1,4 @@
-"""cache_staleness — a larger scenario, built directly on the Core MCTP API.
+"""cache_staleness — a larger scenario, built directly on the Core ASTP API.
 
 Story: Agent A investigates intermittent stale reads from a distributed cache. A's first
 decision (bound staleness with a TTL) is SUPERSEDED after benchmarks show TTL only shrinks
@@ -8,14 +8,14 @@ path.
 
 Larger than bug43: more components, two superseded decisions, two irrelevant subsystems, and
 a real MISLEADING trap — the abandoned "increase the TTL" approach, which a flat transcript
-carries and MCTP filters via the supersede edge.
+carries and ASTP filters via the supersede edge.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-import mctpbench  # noqa: F401  (sys.path bootstrap to Core MCTP)
-from mctp import MCTPStore, Provenance
+import mctpbench  # noqa: F401  (sys.path bootstrap to Core ASTP)
+from astp import AstpStore, Provenance
 
 
 def _p(agent="agent_A", ts=0, source="transcript", conf=1.0):
@@ -23,7 +23,7 @@ def _p(agent="agent_A", ts=0, source="transcript", conf=1.0):
 
 
 def build():
-    s = MCTPStore()
+    s = AstpStore()
 
     # --- tasks ---
     s.assert_node("task_A", "task",

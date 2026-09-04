@@ -1,4 +1,4 @@
-# MCTP-Bench Data Model
+# ASTP-Bench Data Model
 
 What every benchmark run records, how it is stored, and how it is scored. The goal is to preserve
 everything (full model output, chain-of-thought, token counts, second-by-second timing, and
@@ -34,7 +34,7 @@ One record per (suite, task, condition, model, trial):
  "prompt_ref": "outputs/<run_id>.prompt.txt", # large text stored as a file
  "context_tokens": 503, "packet_node_ids": [...],
 
- # MCTP behavior
+ # ASTP behavior
  "retrieved_ids": [...], "retrieved_tokens": 325, "codebase_reads": 0,
 
  # output, everything the model produced
@@ -121,7 +121,7 @@ are synced back to the repository; the large raw dataset (`results/runs|raw|outp
 host and is published as a dataset release. Development and calibration may run the harness remotely
 against a tunneled endpoint, but the recorded runs are produced on the host.
 
-This requires the MCTP and MCTP-Bench repositories and a Python environment (with the tokenizer
+This requires the ASTP and ASTP-Bench repositories and a Python environment (with the tokenizer
 dependency) on the host, alongside the model server.
 
 ## Objective scoring (at run time)

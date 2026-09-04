@@ -2,12 +2,12 @@
 
 Each record is a repository snapshot plus an in-progress file; the receiver must predict the
 next line of code, which typically depends on symbols defined in other files. The extractor
-turns the repo into MCTP state (so the `mctp` condition can transfer the relevant cross-file
+turns the repo into ASTP state (so the `mctp` condition can transfer the relevant cross-file
 context), while `transcript` dumps the files and `rag` retrieves over them.
 
 Record fields: `task_id`, `files` (path -> content), `target_file`, `prefix` (the target file's
 content up to the cursor), `gold_line` (the next line). Point at the dataset with
-`MCTP_REPOBENCH` or `data/repobench.jsonl`; a bundled sample runs offline. The objective scorer
+`ASTP_REPOBENCH` or `data/repobench.jsonl`; a bundled sample runs offline. The objective scorer
 is a whitespace-insensitive match of the predicted line to the gold line.
 """
 from __future__ import annotations
@@ -29,7 +29,7 @@ _INSTRUCTION = (
 
 
 def _path() -> str:
-    env = os.environ.get("MCTP_REPOBENCH")
+    env = os.environ.get("ASTP_REPOBENCH")
     if env and os.path.exists(env):
         return env
     full = os.path.join(_HERE, "..", "data", "repobench.jsonl")

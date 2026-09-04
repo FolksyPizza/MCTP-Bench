@@ -70,22 +70,22 @@ def _parse_retrieve(text: str) -> list:
 class OpenAICompatRunner:
     """Run a real model via an OpenAI-compatible chat endpoint.
 
-    Configure via constructor or environment: MCTP_MODEL_URL (default http://localhost:8000/v1),
-    MCTP_MODEL, MCTP_API_KEY (default "EMPTY"; vLLM/Ollama ignore it)."""
+    Configure via constructor or environment: ASTP_MODEL_URL (default http://localhost:8000/v1),
+    ASTP_MODEL, ASTP_API_KEY (default "EMPTY"; vLLM/Ollama ignore it)."""
 
     def __init__(self, base_url=None, model=None, api_key=None, question=None,
                  temperature=0.0, max_tokens=None, max_retrieve_rounds=1, timeout=300):
-        self.base_url = (base_url or os.environ.get("MCTP_MODEL_URL",
+        self.base_url = (base_url or os.environ.get("ASTP_MODEL_URL",
                                                     "http://localhost:8000/v1")).rstrip("/")
-        self.model = model or os.environ.get("MCTP_MODEL", "")
-        self.api_key = api_key or os.environ.get("MCTP_API_KEY", "EMPTY")
+        self.model = model or os.environ.get("ASTP_MODEL", "")
+        self.api_key = api_key or os.environ.get("ASTP_API_KEY", "EMPTY")
         self.question = question or DEFAULT_QUESTION
         self.temperature = temperature
         # Reasoning models spend most of the budget on hidden thinking before the answer; if the
         # cap is hit mid-thought the final answer is never produced. Non-reasoning models stop
-        # early regardless, so a generous default is safe. Raise it (flag or MCTP_MAX_TOKENS) for
+        # early regardless, so a generous default is safe. Raise it (flag or ASTP_MAX_TOKENS) for
         # heavy reasoners (e.g. 4096+).
-        self.max_tokens = int(max_tokens or os.environ.get("MCTP_MAX_TOKENS", 2048))
+        self.max_tokens = int(max_tokens or os.environ.get("ASTP_MAX_TOKENS", 2048))
         self.max_retrieve_rounds = max_retrieve_rounds
         self.timeout = timeout
         self.name = f"model:{self.model}" if self.model else "model"

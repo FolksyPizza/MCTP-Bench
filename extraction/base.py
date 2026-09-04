@@ -5,9 +5,9 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import mctpbench  # noqa: E402,F401  (bootstraps MCTP_HOME onto sys.path)
+import mctpbench  # noqa: E402,F401  (bootstraps ASTP_HOME onto sys.path)
 
-from mctp import MCTPStore, Provenance  # noqa: E402
+from astp import AstpStore, Provenance  # noqa: E402
 
 # extension -> language label for artifact refs
 LANGUAGES = {
@@ -32,5 +32,5 @@ class Extractor:
     name = "extractor"
 
     def extract(self, repo: dict, task_text: str, task_id: str = "task_main"):
-        """repo: {path -> file content}. Returns (MCTPStore, task_node_id)."""
+        """repo: {path -> file content}. Returns (AstpStore, task_node_id)."""
         raise NotImplementedError

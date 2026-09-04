@@ -1,7 +1,7 @@
-# MCTP-Bench
+# ASTP-Bench
 
-Evaluation harness for [MCTP](https://github.com/FolksyPizza/MCTP). It runs handoff
-experiments as repeatable, scored episodes and measures whether MCTP maintains task
+Evaluation harness for [ASTP](https://github.com/FolksyPizza/ASTP). It runs handoff
+experiments as repeatable, scored episodes and measures whether ASTP maintains task
 performance while reducing context cost.
 
 ## Run
@@ -18,14 +18,14 @@ python3 run.py --model Qwen/Qwen2.5-32B-Instruct-AWQ --url http://SERVER:8000/v1
 
 `--model` runs every scenario x condition (x `--trials`) through the endpoint and writes to
 `results/model_runs.jsonl`, separate from the curated data. Configure via flags or the
-`MCTP_MODEL_URL`, `MCTP_MODEL`, and `MCTP_API_KEY` environment variables; the runner handles the
+`ASTP_MODEL_URL`, `ASTP_MODEL`, and `ASTP_API_KEY` environment variables; the runner handles the
 `RETRIEVE <id>` retrieve-on-demand round. `--limit N` runs only the first N scenarios (smoke
 test). For reasoning models, raise the generation budget with `--max-tokens 4096` (or the
-`MCTP_MAX_TOKENS` env var) so they finish thinking and reach the final answer; the runner reads
+`ASTP_MAX_TOKENS` env var) so they finish thinking and reach the final answer; the runner reads
 the answer from `content` and falls back to a `reasoning` field when present.
 
-The harness requires the Core MCTP package, located via `MCTP_HOME` (default: sibling
-`../MCTP`). Override for a different checkout: `MCTP_HOME=/path/to/MCTP python3 run.py`.
+The harness requires the Core ASTP package, located via `ASTP_HOME` (default: sibling
+`../ASTP`). Override for a different checkout: `ASTP_HOME=/path/to/ASTP python3 run.py`.
 
 Token counting uses real tokenizers when available (`mctpbench/tokenizers.py`): the tiktoken
 OpenAI encodings and a chars/4 heuristic, with an optional Hugging Face hook for open-model
@@ -51,7 +51,7 @@ scenarios/ # ten scenarios; see docs/SCENARIOS.md for what each does
 adapters/ # suites: humaneval, mbpp, gsm8k, swebench, repobench, longbench, inhouse, swarm
 conditions/ # builders: transcript, summary (same-model), rag (TF-IDF), mctp (Core packet)
 scoring/ # objective scorers (unit tests / exact match / line match) + cross-review judge
-extraction/ # repo -> MCTP graph: heuristic.py (deterministic floor), llm.py (the ceiling)
+extraction/ # repo -> ASTP graph: heuristic.py (deterministic floor), llm.py (the ceiling)
 run.py # in-house scenario CLI
 run_benchmark.py # large-scale matrix runner (suite x models x conditions x trials)
 bench_plan.py # the run plan: suites, model waves, trials, total run count
@@ -74,7 +74,7 @@ Four handoff strategies compared head to head, plus an experimental fifth:
 - `summary`: a same-model summarization of that context (its inference cost is counted).
 - `rag`: TF-IDF retrieval over that context.
 - `mctp`: the Core believed-state packet, selected to a token budget, with retrieve-on-demand.
-- `mctp-r`: MCTP with relevance-ranked selection (retrieval inside the believed-state packet).
+- `mctp-r`: ASTP with relevance-ranked selection (retrieval inside the believed-state packet).
 
 ## Metrics
 
@@ -94,7 +94,7 @@ rate with context cost, are in [docs/RESULTS.md](docs/RESULTS.md), updated as th
 ## Limitations
 
 - `MockRunner` is deterministic and model-free; it validates the harness, not efficacy.
-- Recorded episodes are single-trial, use only Claude models, and score with a keyword-based
- `check()`. Additional trials, scenarios, and model families are the next step.
-- Token counts use tiktoken (OpenAI encodings) and the heuristic; open-model tokenizers are
- supported but were not exercised here.
+- Results so far are one capable open-weights model plus two small models, at a single trial for
+  the large model; more models, more trials, and the deferred judge pass are in progress.
+- repobench and swebench are not yet reportable (a completion-prompt fix and native scoring,
+  respectively); scoring is otherwise automated (execution for code, robust matching for QA).

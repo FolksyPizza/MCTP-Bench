@@ -8,7 +8,7 @@ Agent B must continue the migration without regressing to server-side sessions.
 Success: adopts JWT; identifies the rejected session-store approach and why; does not propose
 sessions as the solution.
 Failure mode (MISLEADING): recommends keeping server-side sessions.
-Why MCTP helps: the superseded decision is excluded from the packet via the supersedes edge,
+Why ASTP helps: the superseded decision is excluded from the packet via the supersedes edge,
 and the current decision carries its rationale.
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import mctpbench  # noqa: F401
-from mctp import MCTPStore, Provenance
+from astp import AstpStore, Provenance
 
 
 def _p(agent="agent_A", ts=0, source="transcript", conf=1.0):
@@ -24,7 +24,7 @@ def _p(agent="agent_A", ts=0, source="transcript", conf=1.0):
 
 
 def build():
-    s = MCTPStore()
+    s = AstpStore()
 
     s.assert_node("task_A", "task",
         "Investigate authentication latency and failures under load; the shared session store "

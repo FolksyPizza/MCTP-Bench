@@ -1,7 +1,7 @@
-"""hidden_constraint — a case where MCTP is expected to underperform.
+"""hidden_constraint — a case where ASTP is expected to underperform.
 
 A critical constraint (all user-record deletions must go through the soft-delete tombstone path;
-hard DELETE is forbidden for GDPR/audit) is present in the flat transcript, but in the MCTP
+hard DELETE is forbidden for GDPR/audit) is present in the flat transcript, but in the ASTP
 graph it was recorded against the compliance-review task and never linked to the new
 bulk-delete task. This models an extraction/linking miss: the fact exists in the graph but is
 not reachable from the task, so the selector's packet omits it.
@@ -9,7 +9,7 @@ not reachable from the task, so the selector's packet omits it.
 Expected outcome: the flat condition sees the constraint and answers with soft-delete; the mctp
 condition, missing it, proposes a plain (hard) bulk delete or has to flag that it lacks the
 deletion policy. This demonstrates that extraction fidelity is the system's ceiling and that
-the benchmark can fail MCTP.
+the benchmark can fail ASTP.
 
 Correct answer: bulk-delete via the soft-delete / tombstone path.
 """
@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import mctpbench  # noqa: F401
-from mctp import MCTPStore, Provenance
+from astp import AstpStore, Provenance
 
 
 def _p(agent="agent_A", ts=0, source="transcript", conf=1.0):
@@ -26,7 +26,7 @@ def _p(agent="agent_A", ts=0, source="transcript", conf=1.0):
 
 
 def build():
-    s = MCTPStore()
+    s = AstpStore()
 
     # The constraint is attached to the compliance-review task, not the new endpoint task.
     s.assert_node("task_A", "task",

@@ -1,6 +1,6 @@
 """In-house adapter — the ten control scenarios as benchmark tasks.
 
-Each scenario provides a hand-authored Core MCTP graph and a raw baseline transcript, so all
+Each scenario provides a hand-authored Core ASTP graph and a raw baseline transcript, so all
 four conditions are meaningful (there is real prior context to transfer). The scenario's own
 `check()` is the objective scorer here; it is the keyword check the ensemble judge is meant to
 replace, so these objective passes should be read alongside the judge pass, not instead of it.
@@ -18,7 +18,7 @@ _HERE = os.path.dirname(__file__)
 sys.path.insert(0, os.path.join(_HERE, ".."))
 sys.path.insert(0, os.path.join(_HERE, "..", "scenarios"))
 
-import mctpbench  # noqa: E402  (sets up MCTP_HOME on sys.path)
+import mctpbench  # noqa: E402  (sets up ASTP_HOME on sys.path)
 from mctpbench.runner import DEFAULT_QUESTION  # noqa: E402
 
 

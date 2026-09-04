@@ -7,14 +7,14 @@ pool of 50) tests whether inlining everything causes the receiver to report the 
 
 Success: correct value (20) and correct location; retrieves only the relevant artifact.
 Failure mode (MISLEADING): reports the cache pool (50) instead of the DB pool (20).
-Why MCTP helps: references plus targeted retrieval avoid inlining unrelated files.
+Why ASTP helps: references plus targeted retrieval avoid inlining unrelated files.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 import mctpbench  # noqa: F401
-from mctp import MCTPStore, Provenance
+from astp import AstpStore, Provenance
 
 
 def _p(agent="agent_A", ts=0, source="transcript", conf=1.0):
@@ -22,7 +22,7 @@ def _p(agent="agent_A", ts=0, source="transcript", conf=1.0):
 
 
 def build():
-    s = MCTPStore()
+    s = AstpStore()
 
     s.assert_node("task_B", "task",
         "What database connection pool size does the payments service use, and where is it "

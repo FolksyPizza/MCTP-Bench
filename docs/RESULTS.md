@@ -32,14 +32,14 @@ tolerates markdown, punctuation, and rewording.)
 
 On the low-context suites (gsm8k, humaneval, mbpp) the four conditions fall within one point of
 each other. These tasks carry little prunable prior context, so the delivery method does not
-change the outcome. This is the expected baseline: MCTP does not cost accuracy where there is
+change the outcome. This is the expected baseline: ASTP does not cost accuracy where there is
 nothing to select.
 
-The long-context suite is where the delivery method separates. On longbench, MCTP nearly matches
+The long-context suite is where the delivery method separates. On longbench, ASTP nearly matches
 the full transcript (59 percent against 61 percent) while delivering about one sixty-ninth of the
 context (180 tokens against 12,360), and it scores about thirteen points above same-model
 summarization and TF-IDF retrieval (both near 46 percent). On the smaller models, whose 8192-token
-window forces the transcript to truncate, MCTP wins outright (for example 54 vs 37 percent on the
+window forces the transcript to truncate, ASTP wins outright (for example 54 vs 37 percent on the
 7B) because it selects the load-bearing context instead of losing it to a blind trim.
 
 ## Pending

@@ -76,7 +76,7 @@ WAVES = [
 CONTEXT_WINDOW = 32768   # served context per model (lower context, higher capability + speed)
 
 # Model policy: a single-agent test (every suite except the multi-agent `swarm`) must run on at
-# least this many distinct models, so any MCTP effect is shown to hold across models and is not a
+# least this many distinct models, so any ASTP effect is shown to hold across models and is not a
 # single-model artifact. The swarm suite already exercises multiple agent roles, so it is exempt.
 MIN_MODELS_SINGLE_AGENT = 2
 
@@ -144,7 +144,7 @@ def print_plan():
 
     print("\nMODEL POLICY")
     print(f"  single-agent suites run on all {total_models} models across both waves "
-          f"(>= {MIN_MODELS_SINGLE_AGENT} required, so an MCTP effect is cross-model, not a "
+          f"(>= {MIN_MODELS_SINGLE_AGENT} required, so an ASTP effect is cross-model, not a "
           f"single-model artifact)")
     print(f"  models are capability-gated (scripts/capability_probe.sh) and served at a "
           f"{CONTEXT_WINDOW // 1024}K window; large 32B (AWQ) models run single-agent suites only, "

@@ -140,7 +140,7 @@ def _checkout(repo: str, base_commit: str) -> str:
 def prepare_swebench_files(limit, max_file_kb=64):
     """Augment data/swebench.jsonl (metadata from prepare_swebench) with a `files` snapshot per
     instance: the files touched by the gold patch and test patch, read at base_commit. These are
-    the files the receiver needs; the extractor turns them into MCTP state. Requires git + network
+    the files the receiver needs; the extractor turns them into ASTP state. Requires git + network
     + disk (repos are cached under data/_repo_cache/)."""
     src = os.path.join(DATA, "swebench.jsonl")
     if not os.path.exists(src):

@@ -1,6 +1,6 @@
 """The `episode` record — one handoff run.
 
-This is the unit of MCTP-Bench data: what was delivered, what the receiver did, and how it
+This is the unit of ASTP-Bench data: what was delivered, what the receiver did, and how it
 scored. Logged as JSONL so runs accumulate into a training/eval corpus.
 """
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """Deterministic extractor — the reproducible floor.
 
-Turns a repository snapshot into a Core MCTP graph with no model: each file becomes an artifact
+Turns a repository snapshot into a Core ASTP graph with no model: each file becomes an artifact
 node (path, content hash, language, parsed symbols); import statements become `depends_on` edges
 between artifacts; the task node is linked (`relates_to`) to the files it names, or, failing an
 explicit mention, to the files whose symbols the task references. It extracts structure, not
@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 import re
 
-from mctp import MCTPStore
+from astp import AstpStore
 
 from .base import Extractor, language_of, prov
 
@@ -80,7 +80,7 @@ class HeuristicExtractor(Extractor):
     name = "heuristic"
 
     def extract(self, repo: dict, task_text: str, task_id: str = "task_main"):
-        s = MCTPStore()
+        s = AstpStore()
         ts = [0]
 
         def nxt():

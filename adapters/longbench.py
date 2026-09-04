@@ -4,11 +4,11 @@ Each record is a long context document plus a question; the receiver answers fro
 the repository suites the source is prose, not code, so there is no code extractor: the document
 is the transferable prior context. `transcript` delivers it whole, `summary` condenses it,
 `rag` retrieves passages, and `mctp` currently delivers a minimal task packet (a prose-to-graph
-extractor is future work, so MCTP's advantage on prose is not yet exercised here — this suite
+extractor is future work, so ASTP's advantage on prose is not yet exercised here — this suite
 mainly stresses the long-context transcript baseline and retrieval).
 
 Record fields: `_id`, `task` (subtask type), `input` (question), `context` (the long document),
-`answers` (list of acceptable answers). Point at the dataset with `MCTP_LONGBENCH` or
+`answers` (list of acceptable answers). Point at the dataset with `ASTP_LONGBENCH` or
 `data/longbench.jsonl`; a bundled sample runs offline. QA-style subsets are scored by any-answer
 match; open-ended subsets are left for the judge.
 """
@@ -30,7 +30,7 @@ _OBJECTIVE_TASKS = {"narrativeqa", "qasper", "multifieldqa_en", "hotpotqa", "2wi
 
 
 def _path() -> str:
-    env = os.environ.get("MCTP_LONGBENCH")
+    env = os.environ.get("ASTP_LONGBENCH")
     if env and os.path.exists(env):
         return env
     full = os.path.join(_HERE, "..", "data", "longbench.jsonl")

@@ -1,6 +1,6 @@
-"""bug43 scenario — reuses the shared MCTP Folia handoff scenario + gold checker.
+"""bug43 scenario — reuses the shared ASTP Folia handoff scenario + gold checker.
 
-The MCTP graph builder and the raw baseline transcript live in the MCTP repo (MCTP_HOME);
+The ASTP graph builder and the raw baseline transcript live in the ASTP repo (ASTP_HOME);
 this file only adds the benchmark-side gold criteria.
 """
 from __future__ import annotations
@@ -8,12 +8,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-import mctpbench  # sets up sys.path to MCTP_HOME (core + bench)
-from scenario import build_scenario  # from $MCTP_HOME/bench/scenario.py
+import mctpbench  # sets up sys.path to ASTP_HOME (core + bench)
+from scenario import build_scenario  # from $ASTP_HOME/bench/scenario.py
 
 
 def _flat_transcript() -> str:
-    path = os.path.join(mctpbench.MCTP_HOME, "bench", "handoff", "baseline_transcript.txt")
+    path = os.path.join(mctpbench.ASTP_HOME, "bench", "handoff", "baseline_transcript.txt")
     with open(path) as f:
         return f.read()
 

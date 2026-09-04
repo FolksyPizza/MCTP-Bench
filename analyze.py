@@ -142,7 +142,7 @@ def main():
         json.dump({"pricing": pricing, "rows": rows}, f, indent=2)
     table = _table(rows)
     with open(os.path.join(agg_dir, "summary.md"), "w") as f:
-        f.write("# MCTP-Bench results summary\n\n")
+        f.write("# ASTP-Bench results summary\n\n")
         f.write(f"{len(runs)} runs, {len(judge)} judged.\n\n")
         f.write(table + "\n")
     print(table)

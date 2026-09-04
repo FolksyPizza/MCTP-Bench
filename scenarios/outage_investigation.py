@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import mctpbench  # noqa: F401
-from mctp import MCTPStore, Provenance
+from astp import AstpStore, Provenance
 
 
 def _p(agent="agent_A", ts=0, source="transcript", conf=1.0):
@@ -96,7 +96,7 @@ _DASHBOARD = """{ "title": "Origin health",
 
 
 def build():
-    s = MCTPStore()
+    s = AstpStore()
 
     s.assert_node("task_A", "task",
         "Root-cause the checkout outage on 03-14: p99 exploded and the origin saturated during "

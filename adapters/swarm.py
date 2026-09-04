@@ -1,4 +1,4 @@
-"""Swarm adapter — multi-agent pipelines that share MCTP state.
+"""Swarm adapter — multi-agent pipelines that share ASTP state.
 
 Each swarm task is a `brief` plus an ordered list of `Stage`s. The stages are run by the
 multi-handoff pipeline (`mctpbench/pipeline.py`), which threads the accumulating state through
@@ -90,7 +90,7 @@ def _pipeline(task_id: str, brief: str, fn: str, asserts: list, carry: str = "",
 
 
 def _data_path() -> str:
-    env = os.environ.get("MCTP_SWARM")
+    env = os.environ.get("ASTP_SWARM")
     if env and os.path.exists(env):
         return env
     return os.path.join(_HERE, "..", "data", "swarm.jsonl")

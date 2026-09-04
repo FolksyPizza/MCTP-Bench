@@ -24,7 +24,7 @@ the recorded single-trial Claude-subagent runs. "mctp" is the total including re
 ## bug43 (Category 1, coding handoff)
 Fix intermittent data loss during partition migration. Correct answer: time-bounded leases;
 renew the lease before copying node state. Contains a superseded distributed-locking decision.
-MCTP filters the stale decision and references the files to change; the receiver made one
+ASTP filters the stale decision and references the files to change; the receiver made one
 targeted retrieve.
 
 ## cache_staleness (Category 2, decision transfer)
@@ -36,13 +36,13 @@ made two confirmatory pulls.
 ## auth_migration (Category 2, decision transfer)
 Continue a migration from server-side sessions to stateless JWT. Correct answer: validate a JWT
 per request; do not regress to sessions. Contains a superseded session-store decision. This is
-the smallest transcript with little to prune, so MCTP was token-worse here (+50%); the receiver
+the smallest transcript with little to prune, so ASTP was token-worse here (+50%); the receiver
 also could not cite the rejected sub-alternative that the flat baseline retained.
 
 ## artifact_selection (Category 3, artifact retrieval)
 Report the database connection pool size for the payments service and where it is set. Only one
 config file is relevant among several; a look-alike distractor (a cache pool of 50 versus the
-DB pool of 20) tests whether inlining every file causes a wrong answer. MCTP delivered only the
+DB pool of 20) tests whether inlining every file causes a wrong answer. ASTP delivered only the
 relevant reference and the receiver made one targeted retrieve; the distractor was never
 delivered.
 
@@ -50,7 +50,7 @@ delivered.
 Fix duplicate charges under retries. Correct answer: deduplicate by idempotency key
 (putIfAbsent) before charging, atomically. The ~2,300-token transcript inlines several files,
 ruled-out suspects, and a benchmark; two approaches (a per-user lock and a timestamp heuristic)
-are superseded. This is the clearest MCTP win: total tokens fell 72% at equal correctness.
+are superseded. This is the clearest ASTP win: total tokens fell 72% at equal correctness.
 
 ## schema_migration (Category 4, larger task, hard constraints)
 Execute a zero-downtime migration to add a NOT NULL column to a large table. Correct answer:
@@ -79,14 +79,14 @@ minute log timeline, and ruled-out suspects (thread pool, bulkhead, health check
 approaches (scale-out and timeout increase) are superseded. The receiver got the fix from the
 packet and requested four referenced files; total tokens fell 67% at equal correctness.
 
-## hidden_constraint (negative control, MCTP expected to underperform)
+## hidden_constraint (negative control, ASTP expected to underperform)
 Add a bulk-delete endpoint for user records. Correct answer: delete via the soft-delete
 tombstone path only; hard DELETE is forbidden for GDPR and audit. The constraint is present in
-the flat transcript, but in the MCTP graph it was linked to the compliance-review task and never
+the flat transcript, but in the ASTP graph it was linked to the compliance-review task and never
 connected to the bulk-delete task, so the selector's packet omits it, an extraction/linking
 miss. Result: the flat condition answered correctly; the mctp condition could not determine the
 required deletion path and abstained. This scenario demonstrates that extraction fidelity is the
-system's ceiling and that the benchmark can fail MCTP. It also exposes a scoring limitation: a
+system's ceiling and that the benchmark can fail ASTP. It also exposes a scoring limitation: a
 purely keyword-based check can be fooled by the mere presence of the `softDelete` symbol in the
 packet, so this run's outcome is judged on whether the receiver actually committed to the
 compliant path.

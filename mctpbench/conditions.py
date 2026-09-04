@@ -1,11 +1,11 @@
-"""Build the two handoff conditions for a scenario, from Core MCTP.
+"""Build the two handoff conditions for a scenario, from Core ASTP.
 
 - flat: the raw Agent-A transcript (everything inline, stale included).
 - mctp: the Core cold-start selector's structured packet + a retrievable blob map.
 """
 from __future__ import annotations
 
-from mctp import build_packet, cold_start_select
+from astp import build_packet, cold_start_select
 
 from . import tokenizers
 

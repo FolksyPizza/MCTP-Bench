@@ -1,6 +1,6 @@
 """LLM-backed extractor — the ceiling.
 
-Prompts a model to read a task and its source and emit an MCTP graph in the closed v0.1
+Prompts a model to read a task and its source and emit an ASTP graph in the closed v0.1
 vocabulary: `task`/`artifact`/`entity`/`decision` nodes and the relation set, including
 superseded approaches. Node/edge types are validated against the Core vocabulary and anything
 off-vocabulary is dropped, so the produced graph is always well-formed even when the model is
@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import re
 
-from mctp import NODE_TYPES, RELATION_TYPES, MCTPStore
+from astp import NODE_TYPES, RELATION_TYPES, AstpStore
 
 from mctpbench.runner import OpenAICompatRunner
 
@@ -78,9 +78,9 @@ class LLMExtractor(Extractor):
         return self.build(_parse(raw), repo, task_id, task_text)
 
     def build(self, spec: dict, repo: dict, task_id: str, task_text: str):
-        """Materialize a parsed spec into a validated MCTPStore. Off-vocabulary types/relations
+        """Materialize a parsed spec into a validated AstpStore. Off-vocabulary types/relations
         are dropped. Public so a stored extraction can be rebuilt without re-calling the model."""
-        s = MCTPStore()
+        s = AstpStore()
         ts = [0]
 
         def nxt():

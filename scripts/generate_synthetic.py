@@ -85,7 +85,7 @@ def gen_multifile(n):
 # later and is only checked at the final stage (the engineer). Distractor stages pad the pipeline
 # to a target depth, so the decision must survive every handoff. This is the multi-agent test:
 # transcript keeps the decision but at growing token cost, summary tends to drop the specific
-# detail, and MCTP carries it as a compact decision node. The base briefs are deliberately generic
+# detail, and ASTP carries it as a compact decision node. The base briefs are deliberately generic
 # (they do not contain the carried decision), so only the threaded state can supply it.
 
 _SWARM_DEPTHS = (3, 5, 8)

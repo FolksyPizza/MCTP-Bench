@@ -1,7 +1,7 @@
 """GSM8K adapter — grade-school math word problems with an exact-match scorer.
 
 Loads the GSM8K JSONL (fields: `question`, `answer`, where `answer` ends in '#### <number>').
-Point at it with `MCTP_GSM8K` or place it at `data/gsm8k.jsonl`; a small bundled sample is used
+Point at it with `ASTP_GSM8K` or place it at `data/gsm8k.jsonl`; a small bundled sample is used
 otherwise. Stateless suite: `transcript` vs `mctp`. The scorer compares the final numeric answer.
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ _INSTRUCTION = (
 
 
 def _path() -> str:
-    env = os.environ.get("MCTP_GSM8K")
+    env = os.environ.get("ASTP_GSM8K")
     if env and os.path.exists(env):
         return env
     full = os.path.join(_HERE, "..", "data", "gsm8k.jsonl")

@@ -1,7 +1,7 @@
 """HumanEval adapter — function completion with an objective unit-test scorer.
 
 Loads the standard HumanEval JSONL (fields: `task_id`, `prompt`, `canonical_solution`,
-`test`, `entry_point`). The dataset file is not vendored; point at it with `MCTP_HUMANEVAL`
+`test`, `entry_point`). The dataset file is not vendored; point at it with `ASTP_HUMANEVAL`
 or place it at `data/HumanEval.jsonl` (see scripts/fetch_datasets.sh). When neither is present,
 a small bundled sample (`data/humaneval_sample.jsonl`) is used so the pipeline runs offline.
 
@@ -31,7 +31,7 @@ _INSTRUCTION = (
 
 
 def _dataset_path() -> str:
-    env = os.environ.get("MCTP_HUMANEVAL")
+    env = os.environ.get("ASTP_HUMANEVAL")
     if env and os.path.exists(env):
         return env
     full = os.path.join(_HERE, "..", "data", "HumanEval.jsonl")

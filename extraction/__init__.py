@@ -1,9 +1,9 @@
-"""Extractors: a real repository or transcript -> a Core MCTP graph.
+"""Extractors: a real repository or transcript -> a Core ASTP graph.
 
 The in-house scenarios hand-author their graphs; running external high-context suites at scale
-requires turning a task's source (a repository snapshot, an issue, a transcript) into an MCTP
+requires turning a task's source (a repository snapshot, an issue, a transcript) into an ASTP
 graph automatically. This is the system's ceiling — the `hidden_constraint` control showed that
-a linking miss here, not the selector, is what fails MCTP — so extraction is measured, not
+a linking miss here, not the selector, is what fails ASTP — so extraction is measured, not
 assumed.
 
 Two extractors:
@@ -17,7 +17,7 @@ Two extractors:
   whose fidelity bounds the system; it needs the model server and is not run here.
 
     get_extractor(name, **kw) -> Extractor
-    extractor.extract(repo, task_text, task_id) -> (MCTPStore, task_id)
+    extractor.extract(repo, task_text, task_id) -> (AstpStore, task_id)
 """
 from __future__ import annotations
 

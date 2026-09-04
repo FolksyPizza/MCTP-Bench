@@ -9,7 +9,7 @@ tier: as the pipeline grows, the `transcript` condition re-sends everything whil
 selected packet, and the per-stage context tokens show the difference.
 
 Every condition threads its own state: `transcript` accumulates the raw stage outputs; `mctp`
-accumulates nodes in an MCTP store and selects a packet per stage; `summary`/`rag` operate over
+accumulates nodes in an ASTP store and selects a packet per stage; `summary`/`rag` operate over
 the accumulated transcript.
 """
 from __future__ import annotations
@@ -18,9 +18,9 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import mctpbench  # noqa: F401  (bootstraps MCTP_HOME)
+import mctpbench  # noqa: F401  (bootstraps ASTP_HOME)
 
-from mctp import MCTPStore, Provenance  # noqa: E402
+from astp import AstpStore, Provenance  # noqa: E402
 
 _FAMILIES = ["qwen", "llama", "gemma", "phi", "mistral", "deepseek", "gpt", "yi"]
 
@@ -77,7 +77,7 @@ def run_pipeline(store, swarm_task, condition, model, trial, runner, tok, *, sum
     tag = f"#{arrangement}" if arrangement else ""
 
     transcript = f"PROJECT BRIEF\n{swarm_task.brief}"
-    mstore = MCTPStore()
+    mstore = AstpStore()
     clock = [0]
 
     def prov(m):

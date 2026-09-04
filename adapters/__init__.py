@@ -1,4 +1,4 @@
-"""Suite adapters: an external benchmark -> MCTP-Bench tasks.
+"""Suite adapters: an external benchmark -> ASTP-Bench tasks.
 
 An adapter turns one suite into a stream of `Task`s. Each task carries the `Source` the four
 conditions build from, the receiver instruction for that suite, an optional objective scorer

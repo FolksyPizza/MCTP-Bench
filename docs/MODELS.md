@@ -1,8 +1,8 @@
 # Models under evaluation
 
-MCTP-Bench measures a context-transfer protocol, so the receiver models have to be able to perform
+ASTP-Bench measures a context-transfer protocol, so the receiver models have to be able to perform
 the tasks. A model that fails most tasks makes every condition look identical and hides any real
-difference between the transcript, summary, RAG, and MCTP conditions. Every model therefore passes
+difference between the transcript, summary, RAG, and ASTP conditions. Every model therefore passes
 a capability gate before it is admitted to the full suite. This page records what the evaluation
 runs on, what passed, and what proved unsuitable.
 

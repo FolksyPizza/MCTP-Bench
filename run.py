@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCTP-Bench CLI.
+"""ASTP-Bench CLI.
 
     python3 run.py                     # MockRunner over all scenarios x conditions
     python3 run.py --real              # additionally include recorded model-in-the-loop episodes
@@ -75,7 +75,7 @@ REAL_RUNS = [
     (flaky_test, "mctp", ["art_service", "art_clock", "art_test"], True, _C_FLAKY),
     (hidden_constraint, "flat", [], True, {"respects_soft_delete": True, "mechanism_bulk": True}),
     # The packet omitted the soft-delete constraint (an extraction-linking miss), so the mctp
-    # agent could not determine the required deletion path and abstained: a genuine MCTP failure.
+    # agent could not determine the required deletion path and abstained: a genuine ASTP failure.
     (hidden_constraint, "mctp", [], False,
      {"respects_soft_delete": False, "mechanism_bulk": True}),
     (outage_investigation, "flat", [], True, _C_OUTAGE),

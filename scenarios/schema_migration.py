@@ -10,14 +10,14 @@ Correct answer: expand/contract — add the column nullable, backfill in batches
 job, then add the NOT NULL constraint in a later step; never a single blocking ALTER or a
 maintenance window.
 Failure mode (MISLEADING): proposing the blocking ALTER or a downtime window.
-Why MCTP helps: the transcript is mostly prunable (rejected approaches, full DDL dumps).
+Why ASTP helps: the transcript is mostly prunable (rejected approaches, full DDL dumps).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 import mctpbench  # noqa: F401
-from mctp import MCTPStore, Provenance
+from astp import AstpStore, Provenance
 
 
 def _p(agent="agent_A", ts=0, source="transcript", conf=1.0):
@@ -54,7 +54,7 @@ final class BackfillRegion {
 
 
 def build():
-    s = MCTPStore()
+    s = AstpStore()
 
     s.assert_node("task_A", "task",
         "Plan a migration to add a required `region` column to the orders table without "

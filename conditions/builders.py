@@ -73,7 +73,7 @@ def build_mctp(source: Source, *, budget_tokens=None, **_) -> Built:
     excluding irrelevant nodes and deferring overflow — not from starving the receiver of context
     it needs."""
     if source.graph is not None and source.graph_task_id is not None:
-        from mctp import cold_start_select
+        from astp import cold_start_select
         nodes = cold_start_select(source.graph, source.graph_task_id, budget_tokens=budget_tokens)
         return _mctp_built(source.graph, source.graph_task_id, nodes, "mctp", budget_tokens)
     # No graph: the packet is just the task as current state. Honest for stateless tasks.
@@ -86,7 +86,7 @@ def _mctp_built(graph, task_id, nodes, condition, budget_tokens) -> Built:
     """Build the delivered packet from selected nodes: inline artifact content that fits the
     remaining budget, leave overflow as retrieve-on-demand references. Shared by the mctp
     conditions."""
-    from mctp import build_packet
+    from astp import build_packet
     text = build_packet(graph, nodes, task_id)
     packet_ids = [n.id for n in nodes]
     retrievable, inlined = {}, []
@@ -108,12 +108,12 @@ def _mctp_built(graph, task_id, nodes, condition, budget_tokens) -> Built:
 
 
 def build_mctp_r(source: Source, *, budget_tokens=None, top_k=4, **_) -> Built:
-    """Retrieval-augmented MCTP: the same believed-state packet, but the budget is filled by
+    """Retrieval-augmented ASTP: the same believed-state packet, but the budget is filled by
     relevance to the task rather than by hop distance. The task and decision nodes are still
     guaranteed (the provenance a plain retriever cannot reconstruct); the supporting artifacts and
-    entities are ranked with the same TF-IDF retriever the `rag` condition uses. RAG inside MCTP."""
+    entities are ranked with the same TF-IDF retriever the `rag` condition uses. RAG inside ASTP."""
     if source.graph is not None and source.graph_task_id is not None:
-        from mctp import cold_start_select
+        from astp import cold_start_select
         graph = source.graph
         node_ids = list(graph.nodes)
         contents = [graph.nodes[nid].content or "" for nid in node_ids]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCTP-Bench matrix runner.
+"""ASTP-Bench matrix runner.
 
 Runs suite x models x conditions x trials, recording each run with full raw capture and parsed
 fields into the results storage tree (see docs/DATA-MODEL.md). Objective scoring (unit tests /
@@ -181,7 +181,7 @@ def _iso(epoch: float) -> str:
 
 
 def main():
-    ap = argparse.ArgumentParser(description="MCTP-Bench matrix runner")
+    ap = argparse.ArgumentParser(description="ASTP-Bench matrix runner")
     ap.add_argument("--suite", required=True,
                     help="humaneval | mbpp | gsm8k | swebench | repobench | longbench | "
                          "inhouse | swarm")

@@ -5,7 +5,7 @@ the four receiver inputs. A Source may carry its prior context two ways:
 
 - `transcript` / `docs`: plain text — a raw prior-agent transcript and a corpus of retrievable
   documents (id -> full source). Used by suites without a hand-authored graph.
-- `graph` / `graph_task_id`: a prebuilt Core MCTP graph and the task node within it. The
+- `graph` / `graph_task_id`: a prebuilt Core ASTP graph and the task node within it. The
   in-house scenarios provide this; the `mctp` condition uses the Core selector over it, and
   the other conditions fall back to `transcript` / `docs`.
 
@@ -27,7 +27,7 @@ class Source:
     tier: str = "small"                          # small | medium | large | subagent
     transcript: str = ""                         # raw prior-agent context ("" for bare tasks)
     docs: dict = field(default_factory=dict)     # id -> full source (retrievable corpus)
-    graph: Any = None                            # optional prebuilt Core MCTP graph
+    graph: Any = None                            # optional prebuilt Core ASTP graph
     graph_task_id: str | None = None
 
     @property

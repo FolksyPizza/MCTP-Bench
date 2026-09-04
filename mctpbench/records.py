@@ -50,7 +50,7 @@ class RunRecord:
     packet_node_ids: list = field(default_factory=list)
     prep_tokens: int = 0           # summarizer / embedding cost for this condition
 
-    # MCTP behavior
+    # ASTP behavior
     retrieved_ids: list = field(default_factory=list)
     retrieved_tokens: int = 0
     codebase_reads: int = 0

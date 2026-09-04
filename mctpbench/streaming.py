@@ -100,8 +100,8 @@ def _chunk_reasoning(raw: dict) -> str:
 class StreamingRunner:
     """Streaming counterpart to OpenAICompatRunner.
 
-    Configure via constructor or environment: MCTP_MODEL_URL (default http://localhost:8000/v1),
-    MCTP_MODEL, MCTP_API_KEY (default "EMPTY"; vLLM/Ollama ignore it). `seed` is forwarded when
+    Configure via constructor or environment: ASTP_MODEL_URL (default http://localhost:8000/v1),
+    ASTP_MODEL, ASTP_API_KEY (default "EMPTY"; vLLM/Ollama ignore it). `seed` is forwarded when
     the server supports it, for reproducibility."""
 
     def __init__(self, base_url="http://localhost:8000/v1", model="", api_key="EMPTY",

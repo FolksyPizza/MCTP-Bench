@@ -2,12 +2,12 @@
 
 Each task is a small project snapshot (a handful of files, ~1–2k tokens) plus a question or a
 bug to fix whose answer depends on more than one file. The extractor turns the snapshot into
-MCTP state so all four conditions are meaningful. This is the medium-context tier between the
+ASTP state so all four conditions are meaningful. This is the medium-context tier between the
 stateless low-context suites and the large-repository suites.
 
 Record fields: `task_id`, `files` (path -> content), `task`, and one of `gold_line` (a corrected
 line, scored by line match) or `gold` (a phrase, scored by substring match); tasks with neither
-are left for the judge. Point at the dataset with `MCTP_MULTIFILE` or `data/multifile.jsonl`; a
+are left for the judge. Point at the dataset with `ASTP_MULTIFILE` or `data/multifile.jsonl`; a
 bundled sample runs offline.
 """
 from __future__ import annotations
@@ -29,7 +29,7 @@ _INSTRUCTION = (
 
 
 def _path() -> str:
-    env = os.environ.get("MCTP_MULTIFILE")
+    env = os.environ.get("ASTP_MULTIFILE")
     if env and os.path.exists(env):
         return env
     full = os.path.join(_HERE, "..", "data", "multifile.jsonl")

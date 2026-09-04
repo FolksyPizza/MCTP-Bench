@@ -2,8 +2,8 @@
 
 Loads SWE-bench records (fields: `instance_id`, `problem_statement`, `repo`, `base_commit`,
 `patch`, `test_patch`, `FAIL_TO_PASS`, `PASS_TO_PASS`). The receiver is given the issue and the
-repository as MCTP state (via the extractor) or as the raw file dump (transcript), and must
-produce a patch. Point at the dataset with `MCTP_SWEBENCH` or `data/swebench.jsonl`; a bundled
+repository as ASTP state (via the extractor) or as the raw file dump (transcript), and must
+produce a patch. Point at the dataset with `ASTP_SWEBENCH` or `data/swebench.jsonl`; a bundled
 sample with an inline repo snapshot runs offline.
 
 Objective scoring is deferred: correct SWE-bench evaluation applies the predicted patch to a
@@ -30,7 +30,7 @@ _INSTRUCTION = (
 
 
 def _path() -> str:
-    env = os.environ.get("MCTP_SWEBENCH")
+    env = os.environ.get("ASTP_SWEBENCH")
     if env and os.path.exists(env):
         return env
     full = os.path.join(_HERE, "..", "data", "swebench.jsonl")

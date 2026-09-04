@@ -2,7 +2,7 @@
 
 A long incident investigation into duplicate charges under retries. The flat transcript is
 several thousand tokens: it inlines the full source of several files, log excerpts, a
-benchmark, and reasoning across three approaches (two rejected, one superseded). The MCTP
+benchmark, and reasoning across three approaches (two rejected, one superseded). The ASTP
 packet carries the two live decisions plus references to the three relevant files.
 
 Correct fix: idempotency keys — the charge path must check an idempotency store / ledger for
@@ -13,7 +13,7 @@ Rejected/superseded approaches (present in the flat transcript, filtered from th
 a per-user distributed lock (contention, and it does not survive cross-node retries) and a
 (user, amount, timestamp) heuristic (false positives and negatives).
 
-This scenario exists to test the regime where MCTP is expected to help: a large, noisy context
+This scenario exists to test the regime where ASTP is expected to help: a large, noisy context
 where most content is prunable.
 """
 from __future__ import annotations
@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import mctpbench  # noqa: F401
-from mctp import MCTPStore, Provenance
+from astp import AstpStore, Provenance
 
 
 def _p(agent="agent_A", ts=0, source="transcript", conf=1.0):
@@ -73,7 +73,7 @@ _RETRYPOLICY = """public final class RetryPolicy {
 
 
 def build():
-    s = MCTPStore()
+    s = AstpStore()
 
     s.assert_node("task_A", "task",
         "Investigate duplicate charges: some users are charged two or three times for a single "

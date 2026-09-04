@@ -1,7 +1,7 @@
 """MBPP adapter — short Python tasks with an objective unit-test scorer.
 
 Loads the MBPP JSONL (fields: `task_id`, `text`, `code`, `test_list`, optional
-`test_setup_code`). Point at it with `MCTP_MBPP` or place it at `data/mbpp.jsonl`; a small
+`test_setup_code`). Point at it with `ASTP_MBPP` or place it at `data/mbpp.jsonl`; a small
 bundled sample is used otherwise. Like HumanEval this is a stateless suite, so the meaningful
 comparison is `transcript` vs `mctp`.
 """
@@ -26,7 +26,7 @@ _INSTRUCTION = (
 
 
 def _path() -> str:
-    env = os.environ.get("MCTP_MBPP")
+    env = os.environ.get("ASTP_MBPP")
     if env and os.path.exists(env):
         return env
     full = os.path.join(_HERE, "..", "data", "mbpp.jsonl")

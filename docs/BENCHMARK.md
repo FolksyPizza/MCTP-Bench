@@ -1,4 +1,4 @@
-# MCTP-Bench Suite Design
+# ASTP-Bench Suite Design
 
 This document defines the benchmark suite: its categories, the scenarios in each, and the
 principles all scenarios follow. The suite favors a small number of strong, reproducible
@@ -15,7 +15,7 @@ scenarios over broad, shallow coverage.
  retrieved tokens, total tokens, pass/fail, scoring criteria, and the relevant node/artifact
  ids (see `mctpbench/episode.py`).
 4. The target is the best accuracy/cost tradeoff, not the smallest possible context. A
- scenario should be able to fail MCTP when the packet omits something the task needs.
+ scenario should be able to fail ASTP when the packet omits something the task needs.
 
 ## Conditions
 
@@ -25,7 +25,7 @@ Every scenario is evaluated under at least two conditions:
 - `mctp`: the Core selector packet (explicit state + artifact references) with
  retrieve-on-demand.
 
-Two further baselines are planned so MCTP is compared against strong alternatives rather than
+Two further baselines are planned so ASTP is compared against strong alternatives rather than
 only a raw dump:
 
 - `summary`: the same model as the receiver condenses Agent A's context into a handoff (an agent
@@ -43,7 +43,7 @@ Agent A investigates a bug; Agent B receives the handoff and produces the fix.
 - Success criteria: correct mechanism, correct change site, correct rejected alternative.
 - Failure modes: missing the change site; requesting the codebase because artifacts were
  summarized rather than referenced.
-- Why MCTP should help: filters unrelated code and stale approaches; references the specific
+- Why ASTP should help: filters unrelated code and stale approaches; references the specific
  files and symbols B must change.
 - Scenarios: `bug43` (implemented).
 
@@ -53,7 +53,7 @@ Agent B must continue work without regressing to a rejected or superseded decisi
  reason; does not propose the superseded approach as the solution.
 - Failure modes: recommending the abandoned approach (the MISLEADING label); losing the
  rationale for the current decision.
-- Why MCTP should help: decisions carry supersession and rationale explicitly, and superseded
+- Why ASTP should help: decisions carry supersession and rationale explicitly, and superseded
  decisions are excluded from the packet via the `supersedes` edge.
 - Scenarios: `cache_staleness` (implemented), `auth_migration` (implemented).
 
@@ -63,7 +63,7 @@ targeted retrieval avoid inlining everything.
 - Success criteria: correct answer; retrieves only the relevant artifact(s).
 - Failure modes: retrieving unneeded artifacts (over-retrieval, a precision cost); failing
  because a needed artifact was neither referenced nor retrievable.
-- Why MCTP should help: references let the receiver fetch only what the task requires instead
+- Why ASTP should help: references let the receiver fetch only what the task requires instead
  of receiving all file contents inline.
 - Scenarios: `artifact_selection` (implemented).
 
@@ -71,18 +71,18 @@ targeted retrieval avoid inlining everything.
 Multi-file changes requiring dependency understanding and navigation across a larger graph.
 - Success criteria: correct multi-file change plan; correct dependency ordering.
 - Failure modes: missing a dependency edge; proposing a change that ignores a caller.
-- Why MCTP should help: dependency relations are explicit, so the relevant subgraph can be
+- Why ASTP should help: dependency relations are explicit, so the relevant subgraph can be
  transferred without the whole repository.
 - Scenarios: `payment_idempotency` and `outage_investigation` (implemented), ~2,300 and
  ~2,500-token investigations with several read-but-irrelevant files and superseded approaches.
 
 ### Category 5, Multi-agent workflows
 A research agent, an implementation agent, and a testing agent operate in sequence through
-shared MCTP state.
+shared ASTP state.
 - Success criteria: later agents do not re-derive context already established; final output
  is correct.
 - Failure modes: repeated context transfer; coordination loss between stages.
-- Why MCTP should help: shared state persists across agents, so downstream agents read from
+- Why ASTP should help: shared state persists across agents, so downstream agents read from
  it rather than receiving a fresh transcript.
 - Status: implemented via the multi-handoff pipeline (`mctpbench/pipeline.py`) and the `swarm`
  adapter. Each stage is recorded as its own run, threading the accumulating state through every
@@ -107,14 +107,14 @@ shared MCTP state.
 Category 5 is specified above and left unimplemented pending the multi-handoff support it
 requires. `hidden_constraint` is a negative control: the constraint needed to answer correctly
 is present in the graph but not linked to the task, so the packet omits it and the mctp
-condition fails, demonstrating that the suite can fail MCTP and that extraction/linking fidelity
+condition fails, demonstrating that the suite can fail ASTP and that extraction/linking fidelity
 is the ceiling.
 
 ## Scaling the benchmark
 
 The ten in-house scenarios are illustrative controls with known ground truth and deliberate
 traps. Scale, the goal is several hundred to a thousand tasks, comes from adapting existing
-open-source benchmarks rather than authoring more in-house scenarios, so MCTP is measured on
+open-source benchmarks rather than authoring more in-house scenarios, so ASTP is measured on
 independent tasks across a range of context sizes:
 
 - Low context: function- or question-level tasks, HumanEval, MBPP (code), and short QA /
@@ -123,23 +123,23 @@ independent tasks across a range of context sizes:
 - Medium context: multi-step or small multi-file tasks with moderate context.
 - High context: real-repository and long-context tasks, SWE-bench / SWE-bench Verified (GitHub
  issue-to-patch on large repositories), RepoBench, and long-context suites (LongBench-style).
- This is the regime where MCTP is expected to help most.
+ This is the regime where ASTP is expected to help most.
 - Subagent / swarm: multi-agent pipelines (for example research to implementation to testing) and
  model-to-model handoffs, where accumulated inter-agent state is largest.
 
 Model sizing per tier: 8-14B models for the small and medium tiers, 27-35B for the largest and
 strongest tests (no larger than 35B). Both tracks proceed in parallel, the extractor, needed for
-the high-context suites where MCTP is expected to help most, and the low-context suites, which
-validate the pipeline, baselines, and scoring even though MCTP's advantage there is small.
+the high-context suites where ASTP is expected to help most, and the low-context suites, which
+validate the pipeline, baselines, and scoring even though ASTP's advantage there is small.
 
-Each external suite needs an adapter that (1) builds an MCTP graph from the task's repository or
+Each external suite needs an adapter that (1) builds an ASTP graph from the task's repository or
 context, (2) constructs the `flat` baseline from the same source, (3) runs both conditions
 through a model runner, and (4) scores with the benchmark's own harness (unit tests, exact
 match, or its judge) rather than the in-house keyword checks. Two prerequisites:
 
 - A model runner against local or hosted inference. The `AgentRunner` interface and the Hugging
  Face tokenizer hook already provide the seam.
-- An extractor that turns a real repository or transcript into an MCTP graph. The current
+- An extractor that turns a real repository or transcript into an ASTP graph. The current
  scenarios hand-author their graphs; running external benchmarks at scale requires automatic
  extraction, which also finally exercises extraction fidelity, the system's ceiling, at scale
  (see the `hidden_constraint` finding and the negative control above).
@@ -166,7 +166,7 @@ results/ the storage tree (see DATA-MODEL.md)
 ```
 
 - Adapter contract (`adapters/base.py`): an adapter yields per task an id, the `Source` (the task
- plus its transferable prior context, a transcript, a doc corpus, or a prebuilt MCTP graph), the
+ plus its transferable prior context, a transcript, a doc corpus, or a prebuilt ASTP graph), the
  receiver instruction, an objective scorer where the suite has one, and a gold answer or rubric
  for the judge pass. Implemented: `humaneval` and `mbpp` (unit-test scorers), `gsm8k`
  (final-number match), `swebench` (issue to patch on a repo; objective scoring deferred to the
@@ -174,8 +174,8 @@ results/ the storage tree (see DATA-MODEL.md)
  `longbench` (long-document QA; any-answer match or judge), `inhouse` (the ten controls), and
  `swarm` (multi-agent pipelines). The repository suites build their `mctp` state through the
  extractor (`adapters/base.source_from_repo`).
-- Extraction (`extraction/`): turning a real repository into an MCTP graph, the system's ceiling,
- since a linking miss here (not the selector) is what fails MCTP. `HeuristicExtractor` is the
+- Extraction (`extraction/`): turning a real repository into an ASTP graph, the system's ceiling,
+ since a linking miss here (not the selector) is what fails ASTP. `HeuristicExtractor` is the
  deterministic floor (files -> artifact nodes with parsed symbols and import-derived `depends_on`
  edges; the task linked to the files it names). `LLMExtractor` is the ceiling (a model emits the
  full node/edge vocabulary, including decisions and superseded approaches), validated against the
@@ -267,7 +267,7 @@ Operating a long sweep (`run_benchmark.py`):
 
 Tokenizers: reference token counts are computed under the set from `tokenizers.reference_set()`, 
 the tiktoken encodings plus, when `transformers` is present, open-model tokenizers (Qwen, Llama by
-default). Configure with `MCTP_HF_TOKENIZERS` (add open-model ids) or `MCTP_REF_TOKENIZERS` (an
+default). Configure with `ASTP_HF_TOKENIZERS` (add open-model ids) or `ASTP_REF_TOKENIZERS` (an
 explicit list). The model's own native counts still come from the server `usage`; these reference
 counts make amounts comparable across families that tokenize differently.
 
@@ -312,7 +312,7 @@ total tokens = tasks x conditions x models x trials x per-run tokens
 ```
 
 The `transcript` and `summary` conditions are the expensive ones to run (large inputs); the
-`mctp` condition is the cheapest (small packets), so MCTP is also cheaper to benchmark, which
+`mctp` condition is the cheapest (small packets), so ASTP is also cheaper to benchmark, which
 is itself worth reporting. Throughput numbers are hardware- and model-specific, so **calibrate
 with a 50-100 task micro-run first** to measure real tokens/second, then extrapolate rather than
 trusting a paper estimate.

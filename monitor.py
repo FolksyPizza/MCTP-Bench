@@ -58,7 +58,7 @@ def render(st: dict) -> str:
     state = ("FINISHED" if not st.get("running", True)
              else "STALE" if age > 30 else "running")
     lines = [
-        f"  MCTP-Bench monitor — suite={st.get('suite','?')}  [{state}]",
+        f"  ASTP-Bench monitor — suite={st.get('suite','?')}  [{state}]",
         f"  models: {', '.join(st.get('models', []))}",
         f"  conditions: {', '.join(st.get('conditions', []))}",
         "",

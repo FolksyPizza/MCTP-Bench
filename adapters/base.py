@@ -29,7 +29,7 @@ class Task:
 
 def source_from_repo(suite: str, task_id: str, task_text: str, repo: dict, tier: str = "large",
                      extractor: str = "heuristic", **extractor_kw) -> Source:
-    """Build a Source for a repository task: run the extractor to get an MCTP graph (used by the
+    """Build a Source for a repository task: run the extractor to get an ASTP graph (used by the
     `mctp` condition) and keep the raw files as a transcript/doc corpus (used by the other
     conditions). `repo` is {path -> content}."""
     from extraction import get_extractor
